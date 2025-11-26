@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Dashboard - Credex</title>
+    <link rel="stylesheet" href="/styles.css?v=1.4">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="/index.html">
+                    <span class="logo-icon">🛡️</span>
+                    <h2>Credex</h2>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="/index.html">Home</a>
+                <a href="/candidate-dashboard.html">Dashboard</a>
+                <a href="/skill-profile.html">Skill Profile</a>
+                <a href="#" id="logoutBtn">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dashboard-section">
+        <div class="container">
+            <div class="dashboard-header">
+                <h1>Welcome, <span id="userName">Loading...</span></h1>
+                <p class="text-muted">Candidate ID: <strong id="userProfileId"
+                        style="color: var(--primary-color);">Loading...</strong></p>
+                <p class="text-muted">Manage your verified skills and credentials</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="skillCount">0</div>
+                    <div class="stat-label">Verified Skills</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="credentialCount">0</div>
+                    <div class="stat-label">Credentials</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="overallScore">0</div>
+                    <div class="stat-label">Overall Score</div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <a href="/add-credential.html" class="btn btn-primary">+ Add Credential</a>
+                <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh Verification</button>
+                <a href="/skill-profile.html" class="btn btn-outline">View Full Profile</a>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <h3>Your Skills</h3>
+                    <div id="skillsList" class="skills-list">
+                        <p class="text-muted">Loading skills...</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <h3>Recent Credentials</h3>
+                    <div id="credentialsList" class="credentials-list">
+                        <p class="text-muted">Loading credentials...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3>Strength Areas</h3>
+                <div id="strengthAreas" class="strength-areas">
+                    <p class="text-muted">Loading strength areas...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/candidate-dashboard.js"></script>
+    <script src="/js/navbar.js"></script>
+</body>
+
+</html>

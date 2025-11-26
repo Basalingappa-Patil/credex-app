@@ -1,0 +1,47 @@
+services:
+  # Backend Service
+  - type: web
+    name: credex-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5001
+      - key: MONGODB_URI
+        sync: false # User will need to provide this
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+
+  # BPP Server Service
+  - type: web
+    name: credex-bpp-server
+    env: node
+    rootDir: bpp-server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 6001
+      - key: BPP_ID
+        value: credex-bpp
+      - key: BPP_URI
+        fromService:
+          type: web
+          name: credex-bpp-server
+          property: url
+
+  # Frontend Service (Static Site)
+  - type: web
+    name: credex-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: "" # No build command needed for simple static site
+    staticPublishPath: ./
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

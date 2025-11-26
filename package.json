@@ -1,0 +1,9 @@
+{
+    "name": "skill-verify-net-root",
+    "version": "1.0.0",
+    "description": "Root script to run the backend",
+    "scripts": {
+        "start": "cd backend && npm start",
+        "install-backend": "cd backend && npm install"
+    }
+}

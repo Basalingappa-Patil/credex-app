@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Skill Verification Network</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="/index.html">
+                    <span class="logo-icon">🛡️</span>
+                    <h2>Credex</h2>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="/index.html">Home</a>
+                <a href="/admin.html">Dashboard</a>
+                <a href="#" id="logoutBtn">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="admin-section">
+        <div class="container">
+            <h1>System Overview</h1>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCandidates">0</div>
+                    <div class="stat-label">Total Candidates</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalEmployers">0</div>
+                    <div class="stat-label">Total Employers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCredentials">0</div>
+                    <div class="stat-label">Total Credentials</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="verifiedCredentials">0</div>
+                    <div class="stat-label">Verified</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalIssuers">0</div>
+                    <div class="stat-label">Active Issuers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalVerifications">0</div>
+                    <div class="stat-label">Verifications</div>
+                </div>
+            </div>
+
+            <div class="admin-tabs">
+                <button class="tab-btn active" data-tab="candidates">Candidates</button>
+                <button class="tab-btn" data-tab="employers">Employers</button>
+                <button class="tab-btn" data-tab="issuers">Issuers</button>
+                <button class="tab-btn" data-tab="logs">Verification Logs</button>
+                <button class="tab-btn" data-tab="beckn">Beckn Logs</button>
+                <button class="tab-btn" data-tab="errors">Errors</button>
+            </div>
+
+            <div class="tab-content active" id="candidatesTab">
+                <h2>Candidates</h2>
+                <div id="candidatesList" class="data-table">
+                    <p class="text-muted">Loading candidates...</p>
+                </div>
+            </div>
+
+            <div class="tab-content" id="employersTab">
+                <h2>Employers</h2>
+                <div id="employersList" class="data-table">
+                    <p class="text-muted">Loading employers...</p>
+                </div>
+            </div>
+
+            <div class="tab-content" id="issuersTab">
+                <h2>Issuers & Assessors</h2>
+                <div id="issuersList" class="data-table">
+                    <p class="text-muted">Loading issuers...</p>
+                </div>
+            </div>
+
+            <div class="tab-content" id="logsTab">
+                <h2>Verification Workflow Logs</h2>
+                <div id="verificationLogs" class="data-table">
+                    <p class="text-muted">Loading logs...</p>
+                </div>
+            </div>
+
+            <div class="tab-content" id="becknTab">
+                <h2>Beckn Transaction Logs</h2>
+                <div id="becknLogs" class="data-table">
+                    <p class="text-muted">Loading Beckn logs...</p>
+                </div>
+            </div>
+
+            <div class="tab-content" id="errorsTab">
+                <h2>Errors & Failures</h2>
+                <div id="errorsList" class="data-table">
+                    <p class="text-muted">Loading errors...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/navbar.js"></script>
+</body>
+
+</html>

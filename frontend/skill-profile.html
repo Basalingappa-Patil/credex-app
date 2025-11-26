@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Profile - Skill Verification Network</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="/index.html">
+                    <span class="logo-icon">🛡️</span>
+                    <h2>Credex</h2>
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="/index.html">Home</a>
+                <a href="/candidate-dashboard.html">Dashboard</a>
+                <a href="/skill-profile.html">Skill Profile</a>
+                <a href="#" id="logoutBtn">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="profile-section">
+        <div class="container">
+            <div class="profile-header">
+                <h1>Your Verified Skill Profile</h1>
+                <div class="profile-actions">
+                    <button id="generateQRBtn" class="btn btn-primary">Generate QR Code</button>
+                    <button id="downloadBtn" class="btn btn-secondary">Download Profile</button>
+                </div>
+            </div>
+
+            <div class="profile-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Overall Score:</span>
+                    <span class="stat-value" id="overallScore">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Skills:</span>
+                    <span class="stat-value" id="skillCount">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Last Updated:</span>
+                    <span class="stat-value" id="lastUpdated">-</span>
+                </div>
+            </div>
+
+            <div id="qrCodeSection" class="qr-section" style="display:none;">
+                <h3>Your QR Code</h3>
+                <div id="qrCodeContainer"></div>
+                <p class="help-text">Share this QR code with employers for instant verification</p>
+                <p class="expiry-text">Expires: <span id="qrExpiry">-</span></p>
+            </div>
+
+            <div class="skills-section">
+                <h2>Skills by NSQF Level</h2>
+                <div id="skillsByLevel" class="skills-by-level">
+                    <p class="text-muted">Loading skills...</p>
+                </div>
+            </div>
+
+            <div class="detailed-skills">
+                <h2>Detailed Skill Information</h2>
+                <div id="detailedSkills" class="detailed-skills-list">
+                    <p class="text-muted">Loading detailed information...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/skill-profile.js"></script>
+    <script src="/js/navbar.js"></script>
+</body>
+
+</html>

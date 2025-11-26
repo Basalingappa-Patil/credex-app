@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Credential Document - Credex</title>
+    <link rel="stylesheet" href="/styles.css?v=1.4">
+    <style>
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .document-container {
+            background: white;
+            width: 210mm;
+            /* A4 width */
+            height: 297mm;
+            /* A4 height */
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            color: #333;
+        }
+
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 10rem;
+            opacity: 0.05;
+            color: #000;
+            pointer-events: none;
+            font-weight: bold;
+            z-index: 0;
+        }
+
+        .doc-header {
+            margin-bottom: 60px;
+            border-bottom: 2px solid #eee;
+            width: 100%;
+            padding-bottom: 20px;
+        }
+
+        .doc-logo {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .doc-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1a1a1a;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .doc-content {
+            flex-grow: 1;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .certify-text {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            color: #555;
+        }
+
+        .candidate-name {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 40px;
+            font-family: 'Playfair Display', serif;
+            border-bottom: 1px solid #ccc;
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        .credential-details {
+            margin: 40px 0;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .doc-footer {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 40px;
+            border-top: 2px solid #eee;
+        }
+
+        .signature-block {
+            text-align: center;
+        }
+
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #333;
+            margin-top: 50px;
+            padding-top: 10px;
+            font-weight: bold;
+        }
+
+        .seal {
+            width: 100px;
+            height: 100px;
+            border: 3px solid #d4af37;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #d4af37;
+            font-weight: bold;
+            transform: rotate(-15deg);
+            font-size: 0.9rem;
+            margin: 0 auto;
+        }
+
+        .verified-badge {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: #dcfce7;
+            color: #166534;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            border: 1px solid #166534;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="document-container">
+        <div class="verified-badge">
+            ✓ Digitally Verified
+        </div>
+        <div class="watermark">OFFICIAL</div>
+
+        <div class="doc-header">
+            <div class="doc-logo">🎓</div>
+            <div class="doc-title" id="issuerName">University Name</div>
+        </div>
+
+        <div class="doc-content">
+            <p class="certify-text">This is to certify that</p>
+            <div class="candidate-name" id="candidateName">Candidate Name</div>
+
+            <div class="credential-details">
+                <p>has successfully completed the requirements for</p>
+                <h2 id="credentialTitle" style="color: #2563eb; margin: 20px 0;">Credential Title</h2>
+                <p>Issued on: <strong id="issueDate">Date</strong></p>
+
+                <div
+                    style="margin-top: 40px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
+                    <h4>Skills Demonstrated:</h4>
+                    <ul id="skillsList" style="list-style-type: none; padding: 0;">
+                        <!-- Skills will be populated here -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="doc-footer">
+            <div class="signature-block">
+                <div class="seal">OFFICIAL<br>SEAL</div>
+            </div>
+            <div class="signature-block">
+                <div style="font-family: 'Cursive', cursive; font-size: 1.5rem; color: #000;">Authorized Signatory</div>
+                <div class="signature-line">Registrar / Authority</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+
+            document.getElementById('issuerName').textContent = params.get('issuer') || 'Unknown Issuer';
+            document.getElementById('candidateName').textContent = params.get('name') || 'Unknown Candidate';
+            document.getElementById('credentialTitle').textContent = params.get('title') || 'Credential';
+            document.getElementById('issueDate').textContent = params.get('date') || new Date().toLocaleDateString();
+
+            const skills = params.get('skills');
+            if (skills) {
+                const skillsList = document.getElementById('skillsList');
+                skills.split(',').forEach(skill => {
+                    const li = document.createElement('li');
+                    li.textContent = `• ${skill.trim()}`;
+                    li.style.marginBottom = '5px';
+                    skillsList.appendChild(li);
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
