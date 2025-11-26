@@ -15,6 +15,11 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
+      - key: BPP_HOST
+        fromService:
+          type: web
+          name: credex-bpp-server
+          property: host
 
   # BPP Server Service
   - type: web
@@ -28,11 +33,6 @@ services:
         value: 6001
       - key: BPP_ID
         value: credex-bpp
-      - key: BPP_URI
-        fromService:
-          type: web
-          name: credex-bpp-server
-          property: url
 
   # Frontend Service (Static Site)
   - type: web
