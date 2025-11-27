@@ -1,80 +1,125 @@
-# Credex Deployment Guide for Render
+# Credex Comprehensive Deployment Guide
 
-This guide will walk you through deploying your Credex application (Backend, BPP Server, and Frontend) to Render using the `render.yaml` Blueprint we created.
+This guide explains exactly how to deploy your application to Render for free.
 
-## Prerequisites
+## ❓ Common Questions
 
-1.  **GitHub Account**: You need a GitHub account.
-2.  **Render Account**: Sign up at [render.com](https://render.com) using your GitHub account.
-3.  **Git Installed**: Ensure Git is installed on your local machine.
+### What about `node_modules`?
+*   **We DO NOT upload `node_modules`**: You will notice we added `node_modules/` to a file called `.gitignore`. This tells Git to ignore that folder.
+*   **Why?**: `node_modules` contains thousands of files that are specific to your computer (Windows). The server (Linux) needs its own version.
+*   **How does Render get them?**: When you deploy, Render sees your `package.json` file. It automatically runs `npm install` (the "Build Command") to download and install fresh, compatible `node_modules` directly on the server.
 
-## Step 1: Push Your Code to GitHub
+---
 
-If you haven't already, you need to push your code to a GitHub repository.
+## 🚀 Step-by-Step Deployment
 
-1.  Initialize Git (if not already done):
+### Phase 1: Push Your Code
+First, we need to make sure your code (without `node_modules`) is on GitHub.
+
+1.  **Check Status**:
     ```bash
-    git init
+    git status
     ```
-2.  Add all files:
+    It should say "nothing to commit, working tree clean". If not, run:
     ```bash
     git add .
+    git commit -m "Ready for deployment"
     ```
-3.  Commit your changes:
+
+2.  **Push to GitHub**:
     ```bash
-    git commit -m "Prepare for Render deployment"
+    git push origin master
     ```
-4.  Create a new repository on GitHub.
-5.  Link your local repository to GitHub:
+    *   Go to your GitHub repository in your browser.
+    *   Verify you see folders like `backend`, `frontend`, `bpp-server`.
+    *   Verify you **DO NOT** see `node_modules`.
+
+---
+
+### Phase 2: Deploy the Backend (The Brain)
+The backend handles the logic and database.
+
+1.  Log in to [dashboard.render.com](https://dashboard.render.com/).
+2.  Click **New +** and select **Web Service**.
+3.  Connect your `credex-app` repository.
+4.  **Name**: Enter `credex-backend`.
+5.  **Region**: Choose the one closest to you (e.g., Singapore or Frankfurt).
+6.  **Branch**: `master`.
+7.  **Root Directory**: Enter `backend`.
+    *   *Explanation*: This tells Render that your backend code lives inside the `backend` folder, not at the top.
+8.  **Runtime**: `Node`.
+9.  **Build Command**: `npm install`.
+    *   *Explanation*: This installs the dependencies (creates the `node_modules` on the server).
+10. **Start Command**: `npm start`.
+    *   *Explanation*: This runs `node server.js` to start your app.
+11. **Instance Type**: Select **Free**.
+12. **Environment Variables** (Scroll down to "Advanced"):
+    *   Click **Add Environment Variable**.
+    *   Key: `NODE_ENV` | Value: `production`
+    *   Key: `JWT_SECRET` | Value: `supersecretkey123` (or any random text)
+    *   Key: `MONGODB_URI` | Value: `your_mongodb_connection_string`
+        *   *Note*: Get this from MongoDB Atlas. It looks like `mongodb+srv://user:pass@cluster...`
+13. Click **Create Web Service**.
+14. **Wait**: It will take 2-3 minutes. Once it says "Live", look for the URL at the top (e.g., `https://credex-backend.onrender.com`). **Copy this URL.**
+
+---
+
+### Phase 3: Deploy the BPP Server (The Network)
+This connects your app to the Beckn network.
+
+1.  Click **New +** -> **Web Service**.
+2.  Connect `credex-app` again.
+3.  **Name**: `credex-bpp-server`.
+4.  **Root Directory**: `bpp-server`.
+5.  **Runtime**: `Node`.
+6.  **Build Command**: `npm install`.
+7.  **Start Command**: `npm start`.
+8.  **Instance Type**: **Free**.
+9.  **Environment Variables**:
+    *   Key: `BPP_ID` | Value: `credex-bpp`
+10. Click **Create Web Service**.
+11. **Wait**: Once "Live", **Copy the URL** (e.g., `https://credex-bpp-server.onrender.com`).
+
+---
+
+### Phase 4: Connect Backend to BPP
+Now tell the Backend where the BPP Server is.
+
+1.  Go to your **Backend** service dashboard on Render.
+2.  Click **Environment** on the left.
+3.  Click **Add Environment Variable**.
+4.  Key: `BPP_HOST`
+5.  Value: `credex-bpp-server.onrender.com`
+    *   *Important*: Paste the BPP URL **without** `https://` and **without** any slashes `/`. Just the domain.
+6.  Click **Save Changes**. The backend will automatically restart to apply this change.
+
+---
+
+### Phase 5: Deploy the Frontend (The Face)
+This is the website users will see.
+
+1.  **Update Local Config**:
+    *   Open `frontend/js/config.js` in VS Code.
+    *   Paste your **Backend URL** (from Phase 2) there.
+    ```javascript
+    const CONFIG = {
+        API_URL: 'https://credex-backend.onrender.com/api' // Make sure /api is at the end
+    };
+    ```
+2.  **Push Change**:
     ```bash
-    git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+    git add .
+    git commit -m "Update API URL for production"
+    git push
     ```
-6.  Push your code:
-    ```bash
-    git push -u origin master
-    ```
+3.  **Deploy on Render**:
+    *   Click **New +** -> **Static Site**.
+    *   Connect `credex-app`.
+    *   **Name**: `credex-frontend`.
+    *   **Root Directory**: `frontend`.
+    *   **Build Command**: Leave empty (we don't need to build anything for simple HTML/JS).
+    *   **Publish Directory**: `./` (this means "current directory", i.e., `frontend`).
+    *   **Instance Type**: **Free**.
+4.  Click **Create Static Site**.
 
-## Step 2: Deploy to Render
-
-1.  **Log in to Render**.
-2.  Click on the **"New +"** button and select **"Blueprint"**.
-3.  Connect your GitHub account if you haven't already.
-4.  Select the repository you just pushed.
-5.  **Service Group Name**: Enter a name for your project (e.g., `credex-deployment`).
-6.  **Environment Variables**:
-    *   Render will detect the services defined in `render.yaml`.
-    *   You will see a prompt to enter `MONGODB_URI` for the `credex-backend` service.
-    *   **Action Required**: Enter your MongoDB connection string (e.g., from MongoDB Atlas).
-7.  Click **"Apply Blueprint"**.
-
-## Step 3: Final Configuration
-
-Render will now start deploying your services.
-
-1.  **Wait for Deployment**: It may take a few minutes for all services to build and deploy.
-2.  **Update Frontend Configuration**:
-    *   Once the **Backend** service is live, copy its URL (e.g., `https://credex-backend.onrender.com`).
-    *   Go to your GitHub repository.
-    *   Edit `frontend/js/config.js`.
-    *   Update the `API_URL` to point to your deployed backend:
-        ```javascript
-        const CONFIG = {
-            API_URL: 'https://credex-backend.onrender.com/api' // Replace with your actual Backend URL
-        };
-        ```
-    *   Commit the change.
-    *   Render will automatically redeploy the frontend with the new configuration.
-
-## Troubleshooting
-
-*   **Build Failed**: Check the logs in the Render dashboard for the specific service.
-*   **CORS Errors**: Ensure your Backend allows requests from your Frontend URL. You might need to update the `cors` configuration in `backend/server.js` if it's too restrictive.
-*   **Database Connection**: Double-check your `MONGODB_URI`. Ensure your IP is whitelisted in MongoDB Atlas (allow access from anywhere `0.0.0.0/0` for Render).
-
-## Architecture Overview
-
-*   **credex-backend**: Node.js API handling user data and verification logic.
-*   **credex-bpp-server**: Node.js server for Beckn Protocol integration.
-*   **credex-frontend**: Static HTML/JS site serving the user interface.
-
-You are now live! 🚀
+**Success!** Click the URL provided by the Static Site to view your live application.
