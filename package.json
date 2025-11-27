@@ -4,6 +4,9 @@
     "description": "Root script to run the backend",
     "scripts": {
         "start": "cd backend && npm start",
-        "install-backend": "cd backend && npm install"
+        "install-backend": "cd backend && npm install",
+        "install-bpp": "cd bpp-server && npm install",
+        "install-all": "npm run install-backend && npm run install-bpp",
+        "postinstall": "npm run install-all"
     }
 }

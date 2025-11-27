@@ -6,7 +6,7 @@ class BecknService {
   constructor() {
     this.bapId = process.env.BAP_ID || 'skill-verification-bap';
     this.bapUri = process.env.BAP_URI || 'http://localhost:5001/api/beckn';
-    this.bppUri = process.env.BPP_URI || (process.env.BPP_HOST ? `https://${process.env.BPP_HOST}/beckn` : undefined);
+    this.bppUri = process.env.BPP_URI; // Target BPP
     this.gatewayUri = process.env.GATEWAY_URI; // Target Gateway
   }
 

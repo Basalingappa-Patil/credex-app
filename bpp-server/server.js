@@ -1,4 +1,11 @@
-require('dotenv').config();
+const path = require('path');
+if (process.env.NODE_ENV !== 'production') {
+    try {
+        require('dotenv').config();
+    } catch (e) {
+        console.log('dotenv not found, skipping...');
+    }
+}
 const express = require('express');
 const cors = require('cors');
 const becknRoutes = require('./routes/becknRoutes');
