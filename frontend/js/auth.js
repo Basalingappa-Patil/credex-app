@@ -1,4 +1,4 @@
-const API_URL = windconst API_URL = window.API_URL || 'http://localhost:5001/api';
+const API_URL = window.API_URL || 'http://localhost:5001/api';
 
 // University Data and Autocomplete Logic
 const fallbackUniversities = [
@@ -124,19 +124,22 @@ if (signupForm) {
     const employerFields = document.getElementById('employerFields');
     const candidateFields = document.getElementById('candidateFields');
 
-    roleSelect.addEventListener('change', () => {
+    function toggleFields() {
         if (roleSelect.value === 'employer') {
             employerFields.style.display = 'block';
             candidateFields.style.display = 'none';
         } else if (roleSelect.value === 'admin') {
-            // Admin might not need specific fields or can share employer fields if needed
             employerFields.style.display = 'none';
             candidateFields.style.display = 'none';
         } else {
             employerFields.style.display = 'none';
             candidateFields.style.display = 'block';
         }
-    });
+    }
+
+    roleSelect.addEventListener('change', toggleFields);
+    // Call on load to set initial state
+    toggleFields();
 
     signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
