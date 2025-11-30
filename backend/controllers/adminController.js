@@ -202,18 +202,22 @@ exports.getEmployers = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findByIdAndDelete(id);
+    const user = await User.findById(id);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Also clean up related data if necessary (optional for now, but good practice)
+    if (user.role === 'admin') {
+      return res.status(403).json({ error: 'Cannot delete admin users' });
+    }
+
+    await User.findByIdAndDelete(id);
+
+    // Cleanup related data (optional but recommended)
     if (user.role === 'candidate') {
       await CandidateSkillGraph.deleteOne({ candidateId: id });
-      // Note: We might want to keep credentials/logs for audit, or delete them. 
-      // For now, we'll keep them but maybe mark them? 
-      // Simplicity: just delete the user.
+      await Credential.deleteMany({ candidateId: id });
     }
 
     res.json({ message: 'User deleted successfully' });
@@ -222,3 +226,4 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete user' });
   }
 };
+

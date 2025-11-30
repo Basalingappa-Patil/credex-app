@@ -1,4 +1,4 @@
-// API_URL is now global, defined in config.js
+const API_URL = 'http://localhost:5001/api';
 
 function checkAuth() {
     const token = localStorage.getItem('token');
@@ -19,6 +19,34 @@ function setupLogout() {
             localStorage.removeItem('user');
             window.location.href = '/login.html';
         });
+    }
+}
+
+async function deleteUser(userId) {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+
+    const token = checkAuth();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            alert('User deleted successfully');
+            // Reload current tab
+            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+            if (activeTab === 'candidates') loadCandidates();
+            if (activeTab === 'employers') loadEmployers();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to delete user');
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Network error while deleting user');
     }
 }
 
@@ -85,7 +113,7 @@ async function loadCandidates() {
                                 <td>${Math.round(c.overallScore || 0)}</td>
                                 <td>${new Date(c.createdAt).toLocaleDateString()}</td>
                                 <td>
-                                    <button onclick="deleteUser('${c._id}')" class="btn-danger btn-sm">Delete</button>
+                                    <button onclick="deleteUser('${c._id}')" class="btn-sm btn-danger" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Delete</button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -95,6 +123,56 @@ async function loadCandidates() {
         }
     } catch (error) {
         console.error('Error loading candidates:', error);
+    }
+}
+
+async function loadEmployers() {
+    const token = checkAuth();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_URL}/admin/employers`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const container = document.getElementById('employersList');
+
+            if (data.employers.length === 0) {
+                container.innerHTML = '<p class="text-muted">No employers found</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.employers.map(e => `
+                            <tr>
+                                <td>${e.name}</td>
+                                <td>${e.email}</td>
+                                <td>${e.role}</td>
+                                <td>${new Date(e.createdAt).toLocaleDateString()}</td>
+                                <td>
+                                    <button onclick="deleteUser('${e._id}')" class="btn-sm btn-danger" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading employers:', error);
     }
 }
 
@@ -277,86 +355,6 @@ async function loadErrors() {
     }
 }
 
-async function deleteUser(userId) {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-        return;
-    }
-
-    const token = checkAuth();
-    if (!token) return;
-
-    try {
-        const response = await fetch(`${API_URL}/admin/users/${userId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-            showToast('User deleted successfully', 'success');
-            // Refresh current view
-            const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-            if (activeTab === 'candidates') loadCandidates();
-            if (activeTab === 'employers') loadEmployers();
-        } else {
-            const data = await response.json();
-            showToast(data.error || 'Failed to delete user', 'error');
-        }
-    } catch (error) {
-        console.error('Error deleting user:', error);
-        showToast('Failed to delete user', 'error');
-    }
-}
-
-async function loadEmployers() {
-    const token = checkAuth();
-    if (!token) return;
-
-    try {
-        const response = await fetch(`${API_URL}/admin/employers`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const container = document.getElementById('employersList');
-
-            if (data.employers.length === 0) {
-                container.innerHTML = '<p class="text-muted">No employers found</p>';
-                return;
-            }
-
-            container.innerHTML = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Employer ID</th>
-                            <th>Joined</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.employers.map(e => `
-                            <tr>
-                                <td>${e.name}</td>
-                                <td>${e.email}</td>
-                                <td>${e.employerId || '-'}</td>
-                                <td>${new Date(e.createdAt).toLocaleDateString()}</td>
-                                <td>
-                                    <button onclick="deleteUser('${e._id}')" class="btn-danger btn-sm">Delete</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
-    } catch (error) {
-        console.error('Error loading employers:', error);
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     setupLogout();
     loadDashboard();
@@ -402,62 +400,3 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
-
-
-function showToast(message, type = 'info') {
-    // Create toast container if it doesn't exist
-    let container = document.getElementById('toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container';
-        container.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        `;
-        document.body.appendChild(container);
-    }
-
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-
-    // Style based on type
-    let bg = '#333';
-    if (type === 'success') bg = '#22c55e';
-    if (type === 'error') bg = '#ef4444';
-    if (type === 'warning') bg = '#f97316';
-
-    toast.style.cssText = `
-        background: ${bg};
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        font-size: 14px;
-        opacity: 0;
-        transform: translateX(100%);
-        transition: all 0.3s ease;
-        min-width: 250px;
-    `;
-
-    container.appendChild(toast);
-
-    // Animate in
-    requestAnimationFrame(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateX(0)';
-    });
-
-    // Remove after 3 seconds
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}

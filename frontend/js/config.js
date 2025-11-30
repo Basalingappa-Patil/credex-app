@@ -1,9 +1,14 @@
 const CONFIG = {
-    // Default to localhost for development, but allow overriding or auto-detection
-    API_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:5001/api'
-        : 'https://your-backend-service-name.onrender.com/api' // Placeholder, will need to be updated after deployment
+    // Default to localhost for development
+    // For production, this should be updated to the actual Render backend URL
+    // You can also define window.BACKEND_URL in your HTML before loading this script to override
+    API_URL: window.BACKEND_URL || (
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:5001/api'
+            : 'https://REPLACE_WITH_YOUR_RENDER_BACKEND_URL.onrender.com/api' // ⚠️ IMPORTANT: Replace this with your actual Render Backend URL
+    )
 };
 
 // Make it globally available
 window.API_URL = CONFIG.API_URL;
+console.log('API Configured:', window.API_URL);

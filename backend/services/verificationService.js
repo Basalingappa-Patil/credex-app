@@ -106,23 +106,13 @@ class VerificationService {
 
   async verifyQR(qrData) {
     try {
-      // 1. Decode QR Data
+      // 1. Decode QR Data (Assuming Base64 encoded JSON)
+      const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
       let credentialData;
-
-      // Try Base64 first (standard for this app)
       try {
-        const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
         credentialData = JSON.parse(decodedString);
       } catch (e) {
-        // If Base64 fails, try raw JSON
-        try {
-          credentialData = JSON.parse(qrData);
-        } catch (e2) {
-          // If both fail, check if it's a simple string/URL that might contain an ID
-          // For now, if it's not JSON, we can't verify the structure, but we can log it
-          console.log('QR Data is not JSON:', qrData);
-          throw new Error('Invalid QR format: Not a valid JSON');
-        }
+        throw new Error('Invalid QR format: Not a valid JSON');
       }
 
       // 2. Check Expiry (if applicable)
@@ -147,11 +137,8 @@ class VerificationService {
       }
 
       // 4. Verify against ONEST Registry (if it's an ONEST credential)
-      let networkStatus = 'skipped';
-      if (credentialData.issuer && (credentialData.issuer.toLowerCase().includes('onest') || credentialData.issuer.toLowerCase().includes('beckn'))) {
+      if (credentialData.issuer && credentialData.issuer.includes('onest')) {
         const onestVerification = await this.verifyONESTCredential(credentialData.id);
-        networkStatus = onestVerification.status;
-
         if (!onestVerification.valid) {
           return {
             valid: false,
@@ -164,8 +151,7 @@ class VerificationService {
       return {
         valid: true,
         credential: credentialData,
-        verificationMethod: networkStatus === 'active' ? 'onest_registry' : 'digital_signature',
-        networkStatus: networkStatus,
+        verificationMethod: 'digital_signature',
         timestamp: new Date()
       };
 

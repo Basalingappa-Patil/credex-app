@@ -1,4 +1,4 @@
-// API_URL is now global, defined in config.js
+const API_URL = 'http://localhost:5001/api';
 
 // University Data and Autocomplete Logic
 const fallbackUniversities = [

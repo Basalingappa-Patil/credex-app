@@ -1,4 +1,4 @@
-// API_URL is now global, defined in config.js
+const API_URL = 'http://localhost:5001/api';
 
 function checkAuth() {
     const token = localStorage.getItem('token');
@@ -101,10 +101,9 @@ function displayCredentials(credentials) {
 }
 
 async function deleteCredential(credentialId) {
-    // Confirmation removed as per user request
-    // if (!confirm('Are you sure you want to delete this credential? This will also remove associated skills.')) {
-    //     return;
-    // }
+    if (!confirm('Are you sure you want to delete this credential? This will also remove associated skills.')) {
+        return;
+    }
 
     const token = checkAuth();
     if (!token) return;

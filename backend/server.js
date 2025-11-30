@@ -1,11 +1,5 @@
 const path = require('path');
-if (process.env.NODE_ENV !== 'production') {
-  try {
-    require('dotenv').config({ path: path.join(__dirname, '.env') });
-  } catch (e) {
-    console.log('dotenv not found, skipping...');
-  }
-}
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -33,6 +27,8 @@ if (!process.env.MONGODB_URI) {
 //  CONNECT TO ATLAS ONLY
 // ---------------------
 mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
   dbName: "skillverify"
 })
   .then(() => {
@@ -77,10 +73,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend', 'index.html'));
 });
 
-// Removed exec import and usage for production compatibility
+const { exec } = require('child_process');
+
+// ... (existing imports)
+
+// ... (existing imports)
+
+// ... (existing code)
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[OK] Server running on http://0.0.0.0:${PORT}`);
   console.log(`[OK] Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`[OK] Frontend available at: http://0.0.0.0:${PORT}`);
+
+  // Auto-open browser
+  exec(`start http://localhost:${PORT}`);
 });
