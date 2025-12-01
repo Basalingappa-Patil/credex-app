@@ -12,3 +12,4 @@ const CONFIG = {
 // Make it globally available
 window.API_URL = CONFIG.API_URL;
 console.log('API Configured:', window.API_URL);
+// alert('API URL: ' + window.API_URL); // Uncomment for mobile debugging if needed
