@@ -49,6 +49,6 @@ const candidateSkillGraphSchema = new mongoose.Schema({
   metadata: mongoose.Schema.Types.Mixed
 });
 
-
+candidateSkillGraphSchema.index({ candidateId: 1 });
 
 module.exports = mongoose.model('CandidateSkillGraph', candidateSkillGraphSchema);

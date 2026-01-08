@@ -12,7 +12,7 @@ Improve the navigation bar's interactivity and layout, and redesign the hero sec
 - **Links**: Ensure "Home" link is accessible from all pages (including dashboards).
 
 ### 2. Hero Section
-- **Typography**: Increase font size for "CredNex" and the tagline.
+- **Typography**: Increase font size for "Credex" and the tagline.
 - **Styling**: Apply a modern gradient text effect to the title.
 - **Description**: Make the description text larger and more readable.
 

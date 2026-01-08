@@ -1,4 +1,4 @@
-// API_URL is now global, defined in config.js
+const API_URL = 'http://localhost:5001/api';
 
 function checkAuth() {
     const token = localStorage.getItem('token');
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         formData.append('issueDate', document.getElementById('issueDate').value);
 
         const fileInput = document.getElementById('certificateFile');
-        if (fileInput.files.length > 0) {
+        if (fileInput && fileInput.files.length > 0) {
             formData.append('certificateFile', fileInput.files[0]);
             formData.append('hasFile', 'true');
         } else {

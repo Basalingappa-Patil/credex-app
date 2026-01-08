@@ -1,6 +1,5 @@
 const verificationService = require('../services/verificationService');
 const User = require('../models/User');
-const path = require('path');
 
 exports.verifyById = async (req, res) => {
   try {
@@ -52,22 +51,11 @@ exports.verifyStoredCredential = async (req, res) => {
       return res.status(400).json({ error: 'No certificate file associated with this credential' });
     }
 
-    let filePath = credential.rawData.filePath;
-    // Fix path if it's relative and we are in backend dir
-    // If filePath is just "uploads\filename", and we are in backend, we need to make sure it resolves correctly.
-    // server.js is in backend/, uploads/ is in backend/uploads/
-    // So "uploads\filename" is correct relative to CWD if CWD is backend/
-
-    // Ensure absolute path for safety
-    if (!path.isAbsolute(filePath)) {
-      filePath = path.resolve(process.cwd(), filePath);
-    }
-
+    const filePath = credential.rawData.filePath;
     console.log('Verifying stored credential file:', filePath);
 
     if (!fs.existsSync(filePath)) {
-      console.error('File not found at path:', filePath);
-      return res.status(404).json({ error: 'Certificate file not found on server: ' + filePath });
+      return res.status(404).json({ error: 'Certificate file not found on server' });
     }
 
     // Reuse the image processing logic
@@ -85,10 +73,13 @@ exports.verifyStoredCredential = async (req, res) => {
       }
     } catch (err) {
       console.error('Stored image processing error:', err);
-      return res.status(400).json({ error: 'Failed to decode QR code: ' + err.message });
+      return res.status(400).json({ error: 'Failed to decode QR code from stored certificate: ' + err.message });
     }
 
     // Reuse the verification logic
+    // We can call the internal logic of verifyByQR here, but for simplicity let's just duplicate the decoding part
+    // or better, extract it. For now, let's just copy the logic since it's short.
+
     let decodedJson;
     try {
       const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
@@ -104,12 +95,6 @@ exports.verifyStoredCredential = async (req, res) => {
     if (decodedJson && decodedJson.candidateId) {
       const candidate = await User.findById(decodedJson.candidateId);
       if (!candidate) return res.status(404).json({ error: 'Candidate not found in QR data' });
-
-      // Check if candidate has skill graph before verifying
-      const skillGraph = await require('../models/CandidateSkillGraph').findOne({ candidateId: candidate._id });
-      if (!skillGraph) {
-        return res.status(400).json({ error: 'Candidate has no skill graph to verify against.' });
-      }
 
       const verification = await verificationService.verifyCandidate(candidate._id);
 
@@ -137,10 +122,7 @@ exports.verifyStoredCredential = async (req, res) => {
 
   } catch (error) {
     console.error('Verify stored credential error:', error);
-    // Ensure we send JSON even on error
-    if (!res.headersSent) {
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
-    }
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -150,55 +132,29 @@ exports.verifyByQR = async (req, res) => {
 
     // Handle File Upload
     if (req.file) {
-      console.log('Processing uploaded file:', req.file.path);
-
+      console.log('Processing uploaded QR image:', req.file.path);
       try {
-        let image;
-        console.log('Processing file:', req.file.originalname, 'Mime:', req.file.mimetype);
-
-        // Explicitly check for PDF and reject it gracefully
-        if (req.file.mimetype === 'application/pdf' ||
-          req.file.originalname.toLowerCase().endsWith('.pdf')) {
-          // Delete the file
-          if (req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-          return res.status(400).json({
-            error: 'System Limitation: PDF processing is not available on this server. Please upload a SCREENSHOT (JPG/PNG) of your certificate.'
-          });
-        }
-
-        try {
-          // Try reading as image
-          image = await Jimp.read(req.file.path);
-        } catch (jimpError) {
-          console.log('Jimp failed:', jimpError.message);
-
-          if (jimpError.message.includes('application/pdf')) {
-            return res.status(400).json({
-              error: 'System Limitation: PDF processing is not available on this server. Please upload a SCREENSHOT (JPG/PNG) of your certificate.'
-            });
-          }
-          throw jimpError;
-        }
-
+        const image = await Jimp.read(req.file.path);
         const { data, width, height } = image.bitmap;
         const code = jsQR(data, width, height);
 
         if (code) {
           console.log('QR Code found:', code.data);
+          // The QR code from qrcodeService contains a base64 encoded JSON string
+          // We need to decode it first to get the JSON object
+          // But wait, verifyQR expects the base64 string itself as "qrData"
+          // Let's check what code.data is. It is the raw string content of the QR.
+          // If the QR contains "eyJ...", then code.data is "eyJ...".
           qrData = code.data;
         } else {
-          throw new Error('No QR code found in the uploaded file');
+          throw new Error('No QR code found in the uploaded image');
         }
       } catch (err) {
-        console.error('File processing error:', err);
-        // Check for specific Jimp error regarding PDF
-        if (err.message && err.message.includes('application/pdf')) {
-          return res.status(400).json({ error: 'System error: Tried to read PDF as image. Please retry.' });
-        }
-        return res.status(400).json({ error: 'Failed to decode QR code: ' + err.message });
+        console.error('Image processing error:', err);
+        return res.status(400).json({ error: 'Failed to decode QR code from image: ' + err.message });
       } finally {
         // Cleanup uploaded file
-        if (req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        if (req.file.path) fs.unlinkSync(req.file.path);
       }
     }
 
@@ -302,6 +258,23 @@ exports.getCandidateClaims = async (req, res) => {
     });
   } catch (error) {
     console.error('Get candidate claims error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.verifyByJSON = async (req, res) => {
+  try {
+    const jsonObj = req.body;
+
+    // Call service to verify
+    const result = await verificationService.verifyJSON(jsonObj);
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('Verify by JSON error:', error);
     res.status(500).json({ error: error.message });
   }
 };

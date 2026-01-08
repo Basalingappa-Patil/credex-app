@@ -1,4 +1,4 @@
-// API_URL is now global, defined in config.js
+const API_URL = 'http://localhost:5001/api';
 
 function checkAuth() {
     const token = localStorage.getItem('token');
@@ -39,14 +39,10 @@ async function loadDashboard() {
         if (response.ok) {
             const data = await response.json();
 
-            document.getElementById('skillCount').textContent = data.skillGraph.skillCount || 0;
-            document.getElementById('credentialCount').textContent = data.credentialCount || 0;
-            document.getElementById('overallScore').textContent =
-                Math.round(data.skillGraph.overallScore || 0);
 
-            displaySkills(data.skillGraph.skills || []);
-            displayCredentials(data.credentials || []);
-            displayStrengthAreas(data.skillGraph.strengthAreas || []);
+
+            fetchApplications();
+
         } else if (response.status === 401) {
             window.location.href = '/login.html';
         }
@@ -55,129 +51,134 @@ async function loadDashboard() {
     }
 }
 
-function displaySkills(skills) {
-    const skillsList = document.getElementById('skillsList');
 
-    if (skills.length === 0) {
-        skillsList.innerHTML = '<p class="text-muted">No skills verified yet. Add credentials to get started.</p>';
+
+
+// Previously displaySkills
+
+function displayApplications(applications) {
+    const listDiv = document.getElementById('applicationsList');
+    if (!listDiv) return;
+
+    if (applications.length === 0) {
+        listDiv.innerHTML = '<p class="text-muted">You have not applied for any jobs yet.</p>';
         return;
     }
 
-    skillsList.innerHTML = skills.slice(0, 10).map(skill => `
-        <div class="skill-item">
-            <strong>${skill.skillName}</strong>
-            <span class="skill-badge level-${skill.nsqfLevel}">NSQF Level ${skill.nsqfLevel}</span>
-            <div style="margin-top: 0.5rem;">
-                <small>Proficiency: ${skill.proficiency}% | Recency: ${skill.recencyScore}%</small>
-            </div>
-        </div>
-    `).join('');
-}
-
-function displayCredentials(credentials) {
-    const credentialsList = document.getElementById('credentialsList');
-
-    if (credentials.length === 0) {
-        credentialsList.innerHTML = '<p class="text-muted">No credentials added yet.</p>';
-        return;
-    }
-
-    credentialsList.innerHTML = credentials.slice(0, 5).map(cred => `
-        <div class="credential-item">
+    listDiv.innerHTML = applications.map(app => `
+        <div class="credential-item" style="border: 1px solid var(--border-color); padding: 10px; margin-bottom: 8px; border-radius: 6px; background: rgba(255,255,255,0.02);">
             <div style="flex-grow: 1;">
-                <strong>${cred.title || 'Untitled'}</strong>
-                <div><small>${cred.issuerName}</small></div>
-                <div style="margin-top: 0.5rem;">
-                    <span class="skill-badge ${cred.verificationStatus === 'verified' ? 'level-6' : 'level-2'}">
-                        ${cred.verificationStatus}
-                    </span>
-                </div>
+                <strong>${app.jobTitle}</strong>
+                <div><small style="color: var(--text-muted);">${new Date(app.createdAt).toLocaleDateString()}</small></div>
             </div>
-            <button class="btn-delete" onclick="deleteCredential('${cred._id}')" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;">
-                🗑️
-            </button>
+            <span class="skill-badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                ${app.status || 'APPLIED'}
+            </span>
         </div>
     `).join('');
 }
 
-async function deleteCredential(credentialId) {
-    // Confirmation removed as per user request
-    // if (!confirm('Are you sure you want to delete this credential? This will also remove associated skills.')) {
-    //     return;
-    // }
-
-    const token = checkAuth();
-    if (!token) return;
-
-    console.log('Sending delete request for:', credentialId);
+async function fetchApplications() {
+    const listDiv = document.getElementById('applicationsList');
+    if (!listDiv) return;
 
     try {
-        const response = await fetch(`${API_URL}/candidate/credentials/${credentialId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const token = checkAuth();
+        const response = await fetch(`${API_URL}/candidate/applications`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        console.log('Delete response status:', response.status);
-
         if (response.ok) {
-            // Reload dashboard to reflect changes
-            loadDashboard();
+            const apps = await response.json();
+            displayApplications(apps);
         } else {
-            const data = await response.json();
-            console.error('Delete failed:', data);
-            alert('Failed to delete credential: ' + (data.error || 'Unknown error'));
+            console.error('Failed to fetch applications');
+            listDiv.innerHTML = '<p class="text-muted">Failed to load applications.</p>';
         }
     } catch (error) {
-        console.error('Delete error:', error);
-        alert('Error deleting credential');
+        console.error('Error fetching applications:', error);
+        listDiv.innerHTML = '<p class="text-muted">Error loading applications.</p>';
     }
 }
 
-function displayStrengthAreas(areas) {
-    const strengthAreas = document.getElementById('strengthAreas');
 
-    if (areas.length === 0) {
-        strengthAreas.innerHTML = '<p class="text-muted">No strength areas identified yet.</p>';
-        return;
+
+
+
+
+async function fetchJobs() {
+    const listDiv = document.getElementById('jobsList');
+    if (!listDiv) return;
+
+    try {
+        const token = checkAuth();
+        const response = await fetch(`${API_URL}/candidate/jobs`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const jobs = await response.json();
+
+        if (response.ok && jobs.length > 0) {
+            listDiv.innerHTML = jobs.map(job => `
+                <div class="job-card" style="background: rgba(255,255,255,0.05); padding: 15px; margin-bottom: 10px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0; color: var(--primary-color); font-size: 1.1rem;">${job.title}</h4>
+                        <p style="margin: 0 0 5px 0; font-size: 0.8rem; color: var(--text-muted);">Posted: ${new Date(job.createdAt).toLocaleDateString()}</p>
+                        <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">Required: ${job.required_skills.join(', ')}</p>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="applyForJob('${job.job_id}')">Apply</button>
+                </div>
+            `).join('');
+        } else {
+            listDiv.innerHTML = '<p class="text-muted">No jobs available right now.</p>';
+        }
+    } catch (error) {
+        console.error("Error loading jobs:", error);
+        listDiv.innerHTML = '<p class="text-muted">Failed to load jobs.</p>';
     }
-
-    strengthAreas.innerHTML = areas.map(area =>
-        `<span class="strength-badge">${area}</span>`
-    ).join('');
 }
+
+async function applyForJob(jobId) {
+    if (!confirm("Apply for this job? Your profile and skills will be shared.")) return;
+
+    try {
+        const token = checkAuth();
+        const user = JSON.parse(localStorage.getItem('user'));
+
+        const response = await fetch(`${API_URL}/candidate/jobs/${jobId}/apply`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ student_id: user.profileId })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            alert("Applied successfully!");
+        } else {
+            alert("Application failed: " + (data.error || "Unknown error"));
+        }
+    } catch (error) {
+        console.error(error);
+        alert("Network error.");
+    }
+}
+
+// Expose to window for onclick
+window.applyForJob = applyForJob;
 
 document.addEventListener('DOMContentLoaded', () => {
     setupLogout();
     loadDashboard();
+    fetchJobs();
 
-    const refreshBtn = document.getElementById('refreshBtn');
-    refreshBtn.addEventListener('click', async () => {
-        const token = checkAuth();
-        if (!token) return;
+    const refreshJobsBtn = document.getElementById('refreshJobsBtn');
+    if (refreshJobsBtn) {
+        refreshJobsBtn.addEventListener('click', () => {
+            fetchJobs();
+        });
+    }
 
-        refreshBtn.disabled = true;
-        refreshBtn.textContent = 'Refreshing...';
 
-        try {
-            const response = await fetch(`${API_URL}/candidate/refresh-verification`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                await loadDashboard();
-                alert('Verification refreshed successfully!');
-            }
-        } catch (error) {
-            console.error('Error refreshing:', error);
-            alert('Failed to refresh verification');
-        } finally {
-            refreshBtn.disabled = false;
-            refreshBtn.textContent = '🔄 Refresh Verification';
-        }
-    });
 });

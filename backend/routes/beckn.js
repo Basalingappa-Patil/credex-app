@@ -1,17 +1,21 @@
-const express = require('express');
-const router = express.Router();
-const becknController = require('../controllers/becknController');
+const express = require("express");
+const controller = require("../controllers/becknController");
+const verifyIssuer = require("../middleware/verifyIssuer");
 
-router.post('/search', becknController.search);
-router.post('/on_search', becknController.onSearch);
-router.post('/select', becknController.select);
-router.post('/on_select', becknController.onSelect);
-router.post('/confirm', becknController.confirm);
-router.post('/on_confirm', becknController.onConfirm);
-router.post('/status', becknController.status);
-router.post('/on_status', becknController.onStatus);
-router.post('/support', becknController.support);
-router.post('/on_support', becknController.onSupport);
-router.get('/results', becknController.getResults);
+const router = express.Router();
+
+// outbound
+router.post("/search", controller.search);
+router.post("/select", controller.select);
+router.post("/confirm", controller.confirm);
+router.post("/status", controller.status);
+router.post("/support", controller.support);
+
+// inbound (STRICTLY VERIFIED)
+router.post("/on_search", verifyIssuer, controller.onSearch);
+router.post("/on_select", verifyIssuer, controller.onSelect);
+router.post("/on_confirm", verifyIssuer, controller.onConfirm);
+router.post("/on_status", verifyIssuer, controller.onStatus);
+router.post("/on_support", verifyIssuer, controller.onSupport);
 
 module.exports = router;

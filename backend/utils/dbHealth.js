@@ -16,16 +16,16 @@ const wrapDBOperation = async (res, operation, dbFunction) => {
   if (!checkDBConnection()) {
     return dbUnavailableResponse(res, operation);
   }
-
+  
   try {
     return await dbFunction();
   } catch (error) {
     console.error(`${operation} error:`, error);
-
+    
     if (error.name === 'MongooseError' || error.name === 'MongoError') {
       return dbUnavailableResponse(res, operation);
     }
-
+    
     throw error;
   }
 };

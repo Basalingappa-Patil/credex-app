@@ -1,7 +1,7 @@
 const CandidateSkillGraph = require('../models/CandidateSkillGraph');
 const User = require('../models/User');
 const VerificationLog = require('../models/VerificationLog');
-const { generateVerifiablePresentation } = require('../utils/signature');
+const { generateVerifiablePresentation, verifySignature } = require('../utils/signature');
 const { v4: uuidv4 } = require('uuid');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
@@ -106,23 +106,13 @@ class VerificationService {
 
   async verifyQR(qrData) {
     try {
-      // 1. Decode QR Data
+      // 1. Decode QR Data (Assuming Base64 encoded JSON)
+      const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
       let credentialData;
-
-      // Try Base64 first (standard for this app)
       try {
-        const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
         credentialData = JSON.parse(decodedString);
       } catch (e) {
-        // If Base64 fails, try raw JSON
-        try {
-          credentialData = JSON.parse(qrData);
-        } catch (e2) {
-          // If both fail, check if it's a simple string/URL that might contain an ID
-          // For now, if it's not JSON, we can't verify the structure, but we can log it
-          console.log('QR Data is not JSON:', qrData);
-          throw new Error('Invalid QR format: Not a valid JSON');
-        }
+        throw new Error('Invalid QR format: Not a valid JSON');
       }
 
       // 2. Check Expiry (if applicable)
@@ -147,11 +137,8 @@ class VerificationService {
       }
 
       // 4. Verify against ONEST Registry (if it's an ONEST credential)
-      let networkStatus = 'skipped';
-      if (credentialData.issuer && (credentialData.issuer.toLowerCase().includes('onest') || credentialData.issuer.toLowerCase().includes('beckn'))) {
+      if (credentialData.issuer && credentialData.issuer.includes('onest')) {
         const onestVerification = await this.verifyONESTCredential(credentialData.id);
-        networkStatus = onestVerification.status;
-
         if (!onestVerification.valid) {
           return {
             valid: false,
@@ -164,8 +151,7 @@ class VerificationService {
       return {
         valid: true,
         credential: credentialData,
-        verificationMethod: networkStatus === 'active' ? 'onest_registry' : 'digital_signature',
-        networkStatus: networkStatus,
+        verificationMethod: 'digital_signature',
         timestamp: new Date()
       };
 
@@ -214,6 +200,142 @@ class VerificationService {
       lastChecked: new Date(),
       status: verification.valid ? 'active' : 'revoked'
     };
+  }
+  async verifyJSON(jsonObj) {
+    const checks = {
+      'credential-parse': { parsed: false },
+      'credential-validate': { validated: false },
+      'credential-proof': { proofType: null, verified: false },
+      'issuance-date': { valid: false }
+    };
+
+    try {
+      // 1. Parse Check
+      if (!jsonObj || typeof jsonObj !== 'object') {
+        throw new Error('Invalid JSON structure');
+      }
+      checks['credential-parse'].parsed = true;
+
+      // Handle input being an array (Credential Set) or object
+      const credential = Array.isArray(jsonObj) ? jsonObj[0] : jsonObj;
+
+      // Handle Verifiable Presentation wrapper - extract credential if present
+      let targetCred = credential;
+      // Note: If we are verifying the VP itself (which is what we sign now), targetCred is the VP.
+      // If the user pasted a VC inside a VP, we might need logic to verify the VP wrapping it.
+      // For now, let's assume the user pastes the VP we generated.
+
+      if (credential.verifiableCredential && Array.isArray(credential.verifiableCredential)) {
+        // It's a VP. We verify the VP signature.
+        targetCred = credential;
+      }
+
+      // 2. Validate Check (Schema validation)
+      // Relaxed requirements: Allow 'issued' OR 'issuanceDate'. 
+      // Proof is optional for raw data but required for strict verification.
+      const requiredFields = ['@context', 'type', 'credentialSubject', 'issuer'];
+      // If it's a VP (holder property exists), strict checks might differ slightly (VP has holder, VC has issuer).
+      // Let's adjust slightly:
+      // If VP, look for 'holder'. If VC, look for 'issuer'.
+
+      let missingFields = [];
+      if (targetCred.type && targetCred.type.includes('VerifiablePresentation')) {
+        if (!targetCred.holder) missingFields.push('holder');
+      } else {
+        if (!targetCred.issuer) missingFields.push('issuer');
+      }
+
+      if (!targetCred['@context']) missingFields.push('@context');
+      if (!targetCred.type) missingFields.push('type');
+      // VP doesn't need credentialSubject at top level necessarily if it wraps VCs, but our generator adds it.
+
+      if (missingFields.length > 0) {
+        checks['credential-validate'].error = `Missing fields: ${missingFields.join(', ')}`;
+        // Don't fail immediately, try to verify signature if proof exists
+      } else {
+        checks['credential-validate'].validated = true;
+      }
+
+      // 3. Issuance Date Check
+      // Standard is issuanceDate, but some use issued. (VP might use created inside proof, but usually VCs have issuanceDate)
+      // If VP, check proofs created date? Or if it wraps VCs, check them. 
+      // Our generator puts issuanceDate inside the VCs in the VP.
+      // But let's check top level logic first.
+
+      // If it's a VP, let's check the first VC's issuanceDate for this check, or rely on proof.created?
+      // Let's stick to checking if *any* date is present effectively.
+      const dateField = targetCred.issuanceDate || targetCred.issued; // VC property
+      if (dateField) {
+        const issuanceDate = new Date(dateField);
+        if (!isNaN(issuanceDate.getTime()) && issuanceDate <= new Date()) {
+          checks['issuance-date'].valid = true;
+        } else {
+          checks['issuance-date'].error = 'Invalid or future issuance date';
+        }
+      } else if (targetCred.type && targetCred.type.includes('VerifiablePresentation')) {
+        // VP might not have issuanceDate. Check VCs inside.
+        if (targetCred.verifiableCredential && targetCred.verifiableCredential.length > 0) {
+          const firstVc = targetCred.verifiableCredential[0];
+          const vcDate = firstVc.issuanceDate || firstVc.issued;
+          if (vcDate) {
+            const issuanceDate = new Date(vcDate);
+            if (!isNaN(issuanceDate.getTime()) && issuanceDate <= new Date()) {
+              checks['issuance-date'].valid = true;
+            } else {
+              checks['issuance-date'].error = 'Invalid or future issuance date (in VC)';
+            }
+          }
+        }
+      }
+
+      // 4. Proof Check & Signature Verification
+      const proof = jsonObj.proof; // Proof should be at top level for the VP we sign
+      let isVerified = false;
+
+      if (proof) {
+        const p = Array.isArray(proof) ? proof[0] : proof;
+
+        checks['credential-proof'] = {
+          proofType: p.type,
+          verificationMethod: p.verificationMethod,
+          created: p.created,
+          proofPurpose: p.proofPurpose,
+          verified: false
+        };
+
+        // Perform cryptographic verification
+        if (p.proofValue) {
+          // Create copy without proof
+          const docToVerify = { ...jsonObj };
+          delete docToVerify.proof;
+
+          const isValid = verifySignature(docToVerify, p.proofValue);
+
+          checks['credential-proof'].verified = isValid;
+          isVerified = isValid;
+
+          if (!isValid) checks['credential-proof'].error = 'Digital Signature Verification Failed';
+        } else {
+          checks['credential-proof'].error = 'Proof value missing';
+        }
+
+      } else {
+        checks['credential-proof'].error = 'No proof found';
+      }
+
+      return {
+        verified: isVerified,
+        checks
+      };
+
+    } catch (error) {
+      console.error("verifyJSON error", error);
+      return {
+        verified: false,
+        checks,
+        error: error.message
+      };
+    }
   }
 }
 

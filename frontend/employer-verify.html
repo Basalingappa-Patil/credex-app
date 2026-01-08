@@ -35,8 +35,9 @@
             <div class="verify-box">
                 <div class="verify-tabs">
                     <button class="tab-btn active" data-tab="id">Verify by ID</button>
-                    <button class="tab-btn" data-tab="certificate">Verify by Certificate</button>
-                    <button class="tab-btn" data-tab="network">Search Network</button>
+                    <button class="tab-btn" data-tab="json">Verify by JSON</button>
+                    <button class="tab-btn" data-tab="applications">Applicants</button>
+                    <button class="tab-btn" data-tab="postJob">Post Job</button>
                 </div>
 
                 <div class="tab-content active" id="idTab">
@@ -61,42 +62,124 @@
                     </div>
                 </div>
 
-                <div class="tab-content" id="certificateTab">
-                    <form id="verifyByCertificateForm">
-                        <div class="form-group">
-                            <label for="certificateImage">Upload Certificate Image (with QR)</label>
-                            <div class="file-upload-wrapper"
-                                style="border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer;"
-                                onclick="document.getElementById('certificateImage').click()">
-                                <p>Click to upload or drag and drop</p>
-                                <input type="file" id="certificateImage" name="certificateImage" accept="image/*"
-                                    required style="display: none;">
-                                <p id="fileName"
-                                    style="margin-top: 10px; font-weight: bold; color: var(--primary-color);"></p>
+
+
+
+
+                <div class="tab-content" id="jsonTab">
+
+
+                    <div class="json-verify-container" style="display: flex; gap: 20px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.875rem; color: #9ca3af; text-transform: uppercase;">CREDENTIAL /
+                                PRESENTATION:</label>
+                            <textarea id="jsonInput" placeholder="{...}"
+                                style="width: 100%; height: 300px; background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; border: 1px solid #374151; font-size: 0.9rem; line-height: 1.5; resize: none;"></textarea>
+                            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                                <button id="verifyJsonBtn" class="btn btn-primary"
+                                    style="padding: 8px 25px;">Verify</button>
+                                <button id="clearJsonBtn" class="btn btn-outline"
+                                    style="background: transparent; color: #e5e7eb; border: 1px solid #4b5563;">Clear</button>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px;">Verify
-                            Certificate</button>
-                    </form>
+                        <div style="flex: 0.5;">
+                            <label
+                                style="font-size: 0.875rem; color: #9ca3af; text-transform: uppercase; text-align: right; display: block;">OPTIONS:</label>
+                            <textarea placeholder="{}"
+                                style="width: 100%; height: 300px; background: #1f2937; color: #9ca3af; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; border: 1px solid #374151; font-size: 0.9rem; line-height: 1.5; resize: none;"
+                                readonly></textarea>
+                        </div>
+                    </div>
+
+                    <div id="jsonResultContainer"
+                        style="margin-top: 30px; display: none; background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 0; overflow: hidden;">
+                        <div class="result-tabs"
+                            style="border-bottom: 1px solid #374151; padding: 0 10px; background: #111827;">
+                            <button class="result-tab active" data-target="verifiedContent"
+                                style="padding: 15px 20px; background: none; border: none; border-bottom: 2px solid #10b981; font-weight: 600; color: #fff; cursor: pointer;">VERIFIED</button>
+                            <button class="result-tab" data-target="verifierMetaContent"
+                                style="padding: 15px 20px; background: none; border: none; font-weight: 600; color: #9ca3af; cursor: pointer;">VERIFIER
+                                METADATA</button>
+                            <button class="result-tab" data-target="docMetaContent"
+                                style="padding: 15px 20px; background: none; border: none; font-weight: 600; color: #9ca3af; cursor: pointer;">DOCUMENT
+                                METADATA</button>
+                        </div>
+
+                        <div id="verifiedContent" class="tab-pane active" style="padding: 20px;">
+                            <div class="check-item-list">
+                                <!-- Checks will be injected here -->
+                            </div>
+                        </div>
+
+                        <div id="verifierMetaContent" class="tab-pane"
+                            style="display:none; padding: 20px; color: #d1d5db;">
+                            <div class="meta-row" style="margin-bottom: 10px;"><strong
+                                    style="color: #9ca3af; width: 120px; display: inline-block;">Verifier:</strong>
+                                Credex Verification Engine v1.0</div>
+                            <div class="meta-row" style="margin-bottom: 10px;"><strong
+                                    style="color: #9ca3af; width: 120px; display: inline-block;">Method:</strong>
+                                JSON-LD / DataIntegrityProof</div>
+                            <div class="meta-row" style="margin-bottom: 10px;"><strong
+                                    style="color: #9ca3af; width: 120px; display: inline-block;">Mode:</strong> Offline
+                                / Cryptographic</div>
+                            <div class="meta-row" style="margin-bottom: 10px;"><strong
+                                    style="color: #9ca3af; width: 120px; display: inline-block;">Evaluated:</strong>
+                                <span id="evalTimestamp"></span>
+                            </div>
+                        </div>
+
+                        <div id="docMetaContent" class="tab-pane" style="display:none; padding: 20px; color: #d1d5db;">
+                            <pre id="docMetaPre"
+                                style="font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #9ca3af;"></pre>
+                        </div>
+                    </div>
                 </div>
 
-
-
-                <div class="tab-content" id="networkTab">
-                    <form id="searchNetworkForm">
-                        <div class="form-group">
-                            <label for="skillName">Skill Name</label>
-                            <input type="text" id="skillName" name="skillName" placeholder="e.g. JavaScript" required>
+                <div class="tab-content" id="applicationsTab">
+                    <div style="padding: 20px;">
+                        <h3 style="margin-bottom: 20px; color: var(--text-main);">Applied Candidates</h3>
+                        <div id="applicantsList" class="data-table"
+                            style="background: rgba(255,255,255,0.05); padding: 0;">
+                            <p class="text-muted" style="padding: 20px; text-align: center;">Loading...</p>
                         </div>
-                        <div class="form-group">
-                            <label for="issuerName">Issuer Name (Optional)</label>
-                            <input type="text" id="issuerName" name="issuerName" placeholder="e.g. ONEST Provider">
+                    </div>
+                </div>
+
+                <div class="tab-content" id="postJobTab">
+                    <div style="padding: 20px;">
+                        <h3 style="margin-bottom: 20px; color: var(--text-main);">Post a New Job</h3>
+                        <form id="postJobForm" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="form-group">
+                                <label for="jobTitle">Job Title</label>
+                                <input type="text" id="jobTitle" name="title"
+                                    placeholder="e.g. Senior Frontend Developer" required
+                                    style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px;">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="jobSkills">Required Skills (Comma separated)</label>
+                                <input type="text" id="jobSkills" name="skills"
+                                    placeholder="e.g. React, JavaScript, HTML, CSS" required
+                                    style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px;">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="jobDescription">Description</label>
+                                <textarea id="jobDescription" name="description" rows="5" placeholder="Job details..."
+                                    style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; resize: vertical;"></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary"
+                                style="align-self: flex-start; padding: 10px 25px;">Post Job</button>
+                        </form>
+
+                        <hr style="margin: 30px 0; border: 1px solid var(--border-color);">
+
+                        <h3 style="margin-bottom: 20px; color: var(--text-main);">Your Posted Jobs</h3>
+                        <div id="postedJobsList" class="data-table"
+                            style="background: rgba(255,255,255,0.05); padding: 0;">
+                            <p class="text-muted" style="padding: 20px; text-align: center;">Loading jobs...</p>
                         </div>
-                        <button type="submit" class="btn btn-primary">Search Providers</button>
-                    </form>
-                    <div id="networkResults" class="network-results" style="display:none; margin-top: 20px;">
-                        <h3>Search Results</h3>
-                        <div id="providersList" class="providers-list"></div>
                     </div>
                 </div>
             </div>
@@ -122,8 +205,6 @@
         </div>
     </section>
 
-    <script src="/js/config.js"></script>
-    <script src="/js/auth.js"></script>
     <script src="/js/employer-verify.js"></script>
     <script src="/js/navbar.js"></script>
 </body>

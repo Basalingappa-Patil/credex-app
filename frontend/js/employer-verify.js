@@ -1,4 +1,4 @@
-// API_URL is now global, defined in config.js
+const API_URL = 'http://localhost:5001/api';
 
 document.addEventListener('DOMContentLoaded', () => {
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -58,11 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Set up verify button
                 verifyAuthenticityBtn.onclick = () => verifyCandidate(candidateId);
             } else {
-                showToast('Fetch failed: ' + data.error, 'error');
+                alert('Fetch failed: ' + data.error);
             }
         } catch (error) {
             console.error('Error:', error);
-            showToast('Failed to fetch candidate profile', 'error');
+            alert('Failed to fetch candidate profile');
         } finally {
             fetchProfileBtn.disabled = false;
             fetchProfileBtn.textContent = 'Fetch Profile';
@@ -81,18 +81,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayVerificationResult(data.verification);
                 unverifiedClaimsDiv.style.display = 'none'; // Hide claims after verification
             } else {
-                showToast('Verification failed: ' + data.error, 'error');
+                alert('Verification failed: ' + data.error);
             }
         } catch (error) {
             console.error('Error:', error);
-            showToast('Failed to verify candidate', 'error');
+            alert('Failed to verify candidate');
         } finally {
             verifyAuthenticityBtn.disabled = false;
             verifyAuthenticityBtn.textContent = 'Verify Authenticity';
         }
     }
 
-    async function displayUnverifiedClaims(claims, candidateName) {
+    function displayUnverifiedClaims(claims, candidateName) {
         let html = '';
 
         if (claims.skills && claims.skills.length > 0) {
@@ -107,199 +107,395 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (claims.credentials && claims.credentials.length > 0) {
             html += `<h4>Uploaded Credentials</h4><ul>`;
-
-            // We need to collect IDs to verify after rendering
-            const credentialsToVerify = [];
-
             claims.credentials.forEach(c => {
                 // Construct URL for the document viewer
                 const skillsStr = c.skills ? c.skills.map(s => s.name).join(',') : '';
 
-                // Add Verify Button if it has a file
-                let verifyAction = '';
-                let statusBadge = '';
-
-                if (c.rawData && c.rawData.hasFile) {
-                    // It has a file, so we can verify it
-                    verifyAction = ` <button onclick="verifyStoredCertificate('${c._id}')" class="btn btn-sm btn-success" style="margin-left: 10px; padding: 2px 8px; font-size: 0.8rem;">Verify Certificate</button>`;
-
-                    // Status Badge Placeholder
-                    statusBadge = ` <span id="status-${c._id}" class="badge" style="margin-left: 10px; padding: 2px 8px; font-size: 0.8rem; background: #eab308; color: #000;">Verifying...</span>`;
-
-                    credentialsToVerify.push(c._id);
-                }
-
                 html += `<li>
                     <strong>${c.title}</strong> - ${c.issuerName}
                     <br><small>Issued: ${new Date(c.issuedDate).toLocaleDateString()}</small>
-                    ${statusBadge}
-                    ${verifyAction}
                 </li>`;
             });
             html += `</ul>`;
-
-            claimsListDiv.innerHTML = html;
-
-            // Trigger Auto-Verification
-            credentialsToVerify.forEach(id => {
-                verifyCredentialSilently(id);
-            });
-
         } else {
             html += `<p>No credentials uploaded.</p>`;
-            claimsListDiv.innerHTML = html;
         }
-    }
 
-    async function verifyCredentialSilently(credentialId) {
-        const statusSpan = document.getElementById(`status-${credentialId}`);
-        if (!statusSpan) return;
-
-        try {
-            const response = await fetch(`${API_URL}/verify/credential/${credentialId}`, {
-                method: 'POST'
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                statusSpan.textContent = '✓ Verified';
-                statusSpan.style.background = '#22c55e'; // Green
-                statusSpan.style.color = '#fff';
-
-                // Optional: Add tooltip or extra info about network
-                if (data.verification.networkStatus === 'active') {
-                    statusSpan.title = 'Verified via ONEST Registry';
-                    statusSpan.textContent += ' (ONEST)';
-                } else if (data.verification.verificationMethod === 'digital_signature') {
-                    statusSpan.title = 'Verified via Digital Signature';
-                }
-            } else {
-                statusSpan.textContent = '✗ Invalid: ' + (data.error || 'Unknown error');
-                statusSpan.style.background = '#ef4444'; // Red
-                statusSpan.style.color = '#fff';
-                statusSpan.title = data.error || 'Verification failed';
-            }
-        } catch (error) {
-            console.error('Auto-verify error:', error);
-            statusSpan.textContent = '⚠ Error: ' + error.message;
-            statusSpan.style.background = '#f97316'; // Orange
-            statusSpan.style.color = '#fff';
-        }
+        claimsListDiv.innerHTML = html;
     }
 
 
-    const searchNetworkForm = document.getElementById('searchNetworkForm');
-    if (searchNetworkForm) {
-        searchNetworkForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const skillName = document.getElementById('skillName').value;
-            const issuerName = document.getElementById('issuerName').value;
-            const resultsDiv = document.getElementById('networkResults');
-            const listDiv = document.getElementById('providersList');
-            const btn = searchNetworkForm.querySelector('button');
+    // Verify by JSON Logic
+    const verifyJsonBtn = document.getElementById('verifyJsonBtn');
+    const clearJsonBtn = document.getElementById('clearJsonBtn');
+    const jsonInput = document.getElementById('jsonInput');
+    const jsonResultContainer = document.getElementById('jsonResultContainer');
+    const checkItemList = document.querySelector('.check-item-list');
 
-            btn.disabled = true;
-            btn.textContent = 'Searching Network...';
-            resultsDiv.style.display = 'none';
-            listDiv.innerHTML = '';
-
-            try {
-                // 1. Initiate Search
-                const searchRes = await fetch(`${API_URL}/beckn/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        intent: { skillName, issuerName }
-                    })
-                });
-                const searchData = await searchRes.json();
-                const transactionId = searchData.context.transaction_id;
-
-                // 2. Poll for Results
-                let attempts = 0;
-                const maxAttempts = 10;
-                const pollInterval = 2000;
-
-                const poll = setInterval(async () => {
-                    attempts++;
-                    try {
-                        const pollRes = await fetch(`${API_URL}/beckn/results?transactionId=${transactionId}&action=on_search`);
-                        const pollData = await pollRes.json();
-
-                        if (pollData.status === 'completed' && pollData.results) {
-                            clearInterval(poll);
-                            displayProviders(pollData.results.message.catalog.providers);
-                            resultsDiv.style.display = 'block';
-                            btn.disabled = false;
-                            btn.textContent = 'Search Providers';
-                        } else if (attempts >= maxAttempts) {
-                            clearInterval(poll);
-                            showToast('Search timed out. No providers found.', 'warning');
-                            btn.disabled = false;
-                            btn.textContent = 'Search Providers';
-                        }
-                    } catch (err) {
-                        console.error('Polling error:', err);
-                    }
-                }, pollInterval);
-
-            } catch (error) {
-                console.error('Search error:', error);
-                showToast('Failed to initiate search', 'error');
-                btn.disabled = false;
-                btn.textContent = 'Search Providers';
-            }
-        });
-    }
-    const verifyByCertificateForm = document.getElementById('verifyByCertificateForm');
-    if (verifyByCertificateForm) {
-        verifyByCertificateForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById('certificateImage');
-            const file = fileInput.files[0];
-            const btn = verifyByCertificateForm.querySelector('button');
-            const resultDiv = document.getElementById('verificationResult');
-
-            if (!file) {
-                showToast('Please select a certificate image', 'warning');
+    if (verifyJsonBtn) {
+        verifyJsonBtn.addEventListener('click', async () => {
+            const jsonText = jsonInput.value.trim();
+            if (!jsonText) {
+                alert('Please enter JSON text');
                 return;
             }
 
-            btn.disabled = true;
-            btn.textContent = 'Verifying...';
-            resultDiv.style.display = 'none';
+            let jsonObj;
+            try {
+                jsonObj = JSON.parse(jsonText);
+            } catch (e) {
+                alert('Invalid JSON format');
+                return;
+            }
 
-            const formData = new FormData();
-            formData.append('qrImage', file);
+            verifyJsonBtn.disabled = true;
+            verifyJsonBtn.textContent = 'Verifying...';
+            jsonResultContainer.style.display = 'none';
 
             try {
-                const response = await fetch(`${API_URL}/verify/by-qr`, {
+                const response = await fetch(`${API_URL}/verify/json`, {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jsonObj)
                 });
                 const data = await response.json();
 
                 if (data.success) {
-                    displayVerificationResult(data.verification);
+                    displayJsonVerificationResult(data);
                 } else {
-                    showToast('Verification failed: ' + data.error, 'error');
+                    alert('Verification failed: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error:', error);
-                showToast('Failed to verify certificate', 'error');
+                alert('Failed to verify JSON');
             } finally {
-                btn.disabled = false;
-                btn.textContent = 'Verify Certificate';
+                verifyJsonBtn.disabled = false;
+                verifyJsonBtn.textContent = 'Verify';
             }
         });
+    }
 
-        // File name display
-        const fileInput = document.getElementById('certificateImage');
-        fileInput.addEventListener('change', (e) => {
-            const fileName = e.target.files[0]?.name;
-            document.getElementById('fileName').textContent = fileName || '';
+    if (clearJsonBtn) {
+        clearJsonBtn.addEventListener('click', () => {
+            jsonInput.value = '';
+            jsonResultContainer.style.display = 'none';
         });
     }
+
+    // Result Tabs Logic
+    const resultTabs = document.querySelectorAll('.result-tab');
+
+    resultTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all tabs
+            resultTabs.forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottom = 'none';
+                t.style.color = '#9ca3af';
+            });
+
+            // Add active to clicked
+            tab.classList.add('active');
+            tab.style.borderBottom = '2px solid #10b981';
+            tab.style.color = '#fff';
+
+            // Hide all panes
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.style.display = 'none');
+
+            // Show target pane
+            const targetId = tab.dataset.target;
+            document.getElementById(targetId).style.display = 'block';
+        });
+    });
+
+    function displayJsonVerificationResult(data) {
+        jsonResultContainer.style.display = 'block';
+        checkItemList.innerHTML = ''; // Clear previous
+
+        // Reset to first tab
+        resultTabs[0].click();
+
+        const isVerified = data.verified;
+
+        // 1. Populate Verified Check List
+        const verifiedRow = document.createElement('div');
+        verifiedRow.style.padding = '5px 0';
+        verifiedRow.style.fontFamily = 'monospace';
+        verifiedRow.innerHTML = `<strong>VERIFIED:</strong> <span style="color: ${isVerified ? '#10b981' : '#ef4444'}">${isVerified}</span>`;
+        checkItemList.appendChild(verifiedRow);
+
+        if (data.checks) {
+            Object.entries(data.checks).forEach(([key, value]) => {
+                const row = document.createElement('div');
+                row.style.padding = '5px 0';
+                row.style.fontFamily = 'monospace';
+                row.style.borderBottom = '1px solid #374151'; // Darker border
+                row.style.color = '#d1d5db';
+
+                const keySpan = `<span style="text-transform: uppercase;">CHECKS:</span> <span style="color: #9ca3af">${key}:</span>`;
+
+                let valueHtml = '';
+                if (value === true || (value.parsed === true) || (value.validated === true) || (value.valid === true) || (value.verified === true)) {
+                    valueHtml = `<span style="color: #10b981;">true</span>`;
+                    if (typeof value === 'object' && value.proofType) {
+                        valueHtml = `<span style="color: #10b981;">${value.proofType}</span>`;
+                    }
+                } else {
+                    valueHtml = `<span style="color: #ef4444;">${value.error || 'false'}</span>`;
+                }
+
+                if (key === 'credential-proof' && value.proofType) {
+                    valueHtml = `<span style="color: #9ca3af;">${value.proofType}</span>`;
+                }
+
+                row.innerHTML = `${keySpan} ${valueHtml}`;
+                checkItemList.appendChild(row);
+            });
+        }
+
+        // 2. Populate Verifier Metadata
+        document.getElementById('evalTimestamp').textContent = new Date().toISOString();
+
+        // 3. Populate Document Metadata (Raw JSON / Details)
+        // We can show the structure of the input document regarding its type, issuer, etc.
+        const inputJson = JSON.parse(document.getElementById('jsonInput').value);
+        let docMeta = `Type: ${Array.isArray(inputJson.type) ? inputJson.type.join(', ') : inputJson.type}\n`;
+        docMeta += `Issuer: ${typeof inputJson.issuer === 'object' ? inputJson.issuer.id : inputJson.issuer}\n`;
+        docMeta += `Issued: ${inputJson.issuanceDate || inputJson.issued}\n`;
+        if (inputJson.credentialSubject) {
+            docMeta += `Subject: ${inputJson.credentialSubject.id || 'N/A'}\n`;
+        }
+
+        document.getElementById('docMetaPre').textContent = docMeta;
+    }
+    // Post Job Logic
+    const postJobForm = document.getElementById('postJobForm');
+    if (postJobForm) {
+        postJobForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = postJobForm.querySelector('button[type="submit"]');
+
+            // Get user info
+            const userStr = localStorage.getItem('user');
+            if (!userStr) {
+                alert('Please login first');
+                return;
+            }
+            const user = JSON.parse(userStr);
+
+            if (!user.employerId) {
+                // Try to infer or alert
+                alert('Employer ID missing from profile. Please re-login.');
+                return;
+            }
+
+            const formData = new FormData(postJobForm);
+            const jobData = {
+                employer_id: user.employerId,
+                title: formData.get('title'),
+                skills: formData.get('skills'), // handled as string in backend or array?
+                required_skills: formData.get('skills'), // backend expects this key
+                description: formData.get('description')
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Posting...';
+
+            try {
+                const response = await fetch(`${API_URL}/employer/jobs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jobData)
+                });
+
+                if (response.ok) {
+                    alert('Job posted successfully!');
+                    postJobForm.reset();
+                    fetchPostedJobs(); // Refresh list
+                } else {
+                    const data = await response.json();
+                    alert('Failed to post job: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error posting job:', error);
+                alert('Network error posting job');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Post Job';
+            }
+        });
+    }
+
+    // Posted Jobs Logic
+    const postJobTabBtn = document.querySelector('.tab-btn[data-tab="postJob"]');
+    if (postJobTabBtn) {
+        postJobTabBtn.addEventListener('click', () => {
+            fetchPostedJobs();
+        });
+    }
+
+    async function fetchPostedJobs() {
+        const listDiv = document.getElementById('postedJobsList');
+        if (!listDiv) return;
+
+        listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">Loading jobs...</p>';
+
+        try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return;
+            const user = JSON.parse(userStr);
+
+            if (!user.employerId) {
+                listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">Employer information missing.</p>';
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/employer/jobs?employer_id=${user.employerId}`);
+            const jobs = await response.json();
+
+            if (response.ok) {
+                if (jobs.length === 0) {
+                    listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">No active jobs posted.</p>';
+                } else {
+                    displayPostedJobs(jobs);
+                }
+            } else {
+                listDiv.innerHTML = `<p class="text-muted" style="padding: 20px; text-align: center;">Failed to load: ${jobs.error || 'Unknown error'}</p>`;
+            }
+        } catch (err) {
+            console.error(err);
+            listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">Network error loading jobs.</p>';
+        }
+    }
+
+    function displayPostedJobs(jobs) {
+        const listDiv = document.getElementById('postedJobsList');
+        let html = '<div style="display: flex; flex-direction: column; gap: 10px; padding: 15px;">';
+
+        jobs.forEach(job => {
+            const skills = Array.isArray(job.required_skills) ? job.required_skills.join(', ') : job.required_skills;
+            // job.job_id is the UUID
+            html += `
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0 0 5px 0; color: var(--primary-color);">${job.title}</h4>
+                    <p style="margin: 0 0 5px 0; font-size: 0.9rem; color: var(--text-muted);">Required: ${skills}</p>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-light); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 400px;">${job.description || ''}</p>
+                </div>
+                <button class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #ef4444;" onclick="deleteJob('${job.job_id}')">Delete</button>
+            </div>
+            `;
+        });
+
+        html += '</div>';
+        listDiv.innerHTML = html;
+    }
+
+    // Expose delete function Global
+    window.deleteJob = async (jobId) => {
+        if (!confirm('Are you sure you want to delete this job? Candidates will no longer see it.')) return;
+
+        try {
+            const response = await fetch(`${API_URL}/employer/jobs/${jobId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Refresh list
+                fetchPostedJobs();
+                alert('Job deleted.');
+            } else {
+                alert('Failed to delete job.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error deleting job.');
+        }
+    };
+
+    // Applications Tab Logic
+    const applicationsTabBtn = document.querySelector('.tab-btn[data-tab="applications"]');
+    if (applicationsTabBtn) {
+        applicationsTabBtn.addEventListener('click', () => {
+            fetchApplications();
+        });
+    }
+
+    async function fetchApplications() {
+        const listDiv = document.getElementById('applicantsList');
+        listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">Loading applications...</p>';
+
+        try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return;
+            const user = JSON.parse(userStr);
+
+            if (!user.employerId) {
+                listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">Employer ID not found in profile.</p>';
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/employer/applications?employer_id=${user.employerId}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                displayApplications(data);
+            } else {
+                listDiv.innerHTML = `<p class="text-muted" style="padding: 20px; text-align: center;">Failed to load: ${data.error || 'Unknown error'}</p>`;
+            }
+        } catch (err) {
+            console.error(err);
+            listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">Network error loading applications.</p>';
+        }
+    }
+
+    function displayApplications(apps) {
+        const listDiv = document.getElementById('applicantsList');
+        if (!apps || apps.length === 0) {
+            listDiv.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">No applications found.</p>';
+            return;
+        }
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 15px;">';
+        apps.forEach(app => {
+            const skillsStr = (app.skills && app.skills.length > 0) ? app.skills.join(', ') : 'No specific skills listed';
+            const jobTitle = app.jobTitle || 'Unknown Job';
+
+            html += `
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; transition: all 0.3s ease;">
+                <div>
+                    <h4 style="margin: 0 0 5px 0; color: var(--primary-color); font-size: 1.1rem;">${app.candidateName}</h4> 
+                    <p style="margin: 0 0 5px 0; font-size: 0.9rem; color: #fbbf24; font-weight: 600;">Applying for: ${jobTitle}</p>
+                    <p style="margin: 0 0 5px 0; font-size: 0.9rem; color: var(--text-muted);">USN: <span style="color: var(--text-main); font-family: monospace;">${app.student_id}</span></p>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Skills: <span style="color: var(--accent-color);">${skillsStr}</span></p>
+                </div>
+                <div style="text-align: right;">
+                    <div style="margin-bottom: 8px;">
+                        <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;">
+                            ${app.status || 'APPLIED'}
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="window.populateAndVerify('${app.student_id}')" style="padding: 6px 16px; font-size: 0.85rem;">
+                        Verify
+                    </button>
+                </div>
+            </div>
+            `;
+        });
+        html += '</div>';
+        listDiv.innerHTML = html;
+    }
+
+    // Helper to switch tab and verify
+    window.populateAndVerify = (id) => {
+        // Switch to ID tab
+        document.querySelector('.tab-btn[data-tab="id"]').click();
+        // Fill input
+        document.getElementById('candidateId').value = id;
+        // Scroll to form
+        document.getElementById('verifyByIdForm').scrollIntoView({ behavior: 'smooth' });
+    };
+
 });
 
 function displayProviders(providers) {
@@ -346,11 +542,11 @@ window.verifyStoredCertificate = async (credentialId) => {
         if (data.success) {
             displayVerificationResult(data.verification);
         } else {
-            showToast('Verification failed: ' + data.error, 'error');
+            alert('Verification failed: ' + data.error);
         }
     } catch (error) {
         console.error('Error:', error);
-        showToast('Failed to verify certificate: ' + (error.message || error), 'error');
+        alert('Failed to verify certificate');
     } finally {
         btn.disabled = false;
         btn.textContent = originalText;
@@ -409,7 +605,7 @@ window.selectProvider = async (providerId, itemId) => {
         const onConfirmData = await pollResults(transactionId, 'on_confirm');
 
         if (onConfirmData) {
-            showToast('Verification Service Ordered Successfully! Order ID: ' + onConfirmData.message.order.id, 'success');
+            alert('Verification Service Ordered Successfully! Order ID: ' + onConfirmData.message.order.id);
             btn.textContent = 'Ordered';
             btn.classList.remove('btn-outline');
             btn.classList.add('btn-success');
@@ -419,7 +615,7 @@ window.selectProvider = async (providerId, itemId) => {
 
     } catch (error) {
         console.error('Order error:', error);
-        showToast('Failed to order service: ' + error.message, 'error');
+        alert('Failed to order service: ' + error.message);
         btn.disabled = false;
         btn.textContent = originalText;
     }
@@ -463,69 +659,47 @@ function displayVerificationResult(verification) {
 
     candidateInfo.innerHTML = `
         <h3>Candidate Information</h3>
-        <p><strong>Name:</strong> ${verification.candidateName || 'N/A'}</p>
+        <p><strong>Name:</strong> ${verification.candidateName}</p>
         <p><strong>Overall Score:</strong> ${Math.round(verification.overallScore || 0)}/100</p>
-        <p><strong>Total Skills:</strong> ${verification.skillCount || 0}</p>
+        <p><strong>Total Skills:</strong> ${verification.skillCount}</p>
         <p><strong>Verified At:</strong> ${new Date(verification.timestamp).toLocaleString()}</p>
     `;
 
-    if (verification.skills && Array.isArray(verification.skills) && verification.skills.length > 0) {
-        skillsInfo.innerHTML = `
-            <h3>Verified Skills</h3>
-            ${verification.skills.map(skill => `
-                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color);">
-                    <strong>${skill.name}</strong>
-                    <span class="skill-badge level-${skill.nsqfLevel}">Level ${skill.nsqfLevel}</span>
-                    <div style="margin-top: 0.5rem; font-size: 0.875rem;">
-                        Proficiency: ${skill.proficiency}% | Recency: ${skill.recencyScore}%
-                    </div>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
-                        Sources: ${skill.sources ? skill.sources.map(s => s.issuer).join(', ') : 'Unknown'}
-                    </div>
-                </div>
-            `).join('')}
-        `;
-    } else if (verification.credential) {
-        skillsInfo.innerHTML = `
-            <h3>Verified Credential Data</h3>
+    skillsInfo.innerHTML = `
+        <h3>Verified Skills</h3>
+        ${verification.skills.map(skill => `
             <div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color);">
-                <p><strong>Issuer:</strong> ${verification.credential.issuer || 'Unknown'}</p>
-                <p><strong>Issued Date:</strong> ${verification.credential.issuanceDate || 'Unknown'}</p>
-                <div style="margin-top: 10px;">
-                    <strong>Raw Data:</strong>
-                    <pre style="background: #333; padding: 10px; border-radius: 5px; overflow-x: auto; margin-top: 5px; font-size: 0.8rem;">${JSON.stringify(verification.credential, null, 2)}</pre>
+                <strong>${skill.name}</strong>
+                <span class="skill-badge level-${skill.nsqfLevel}">Level ${skill.nsqfLevel}</span>
+                <div style="margin-top: 0.5rem; font-size: 0.875rem;">
+                    Proficiency: ${skill.proficiency}% | Recency: ${skill.recencyScore}%
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
+                    Sources: ${skill.sources.map(s => s.issuer).join(', ')}
                 </div>
             </div>
-        `;
-    } else {
-        skillsInfo.innerHTML = '<p>No specific skill data found in verification result.</p>';
-    }
+        `).join('')}
+    `;
 
     // Display raw JSON
-    if (verification.verifiablePresentation) {
-        vpJson.textContent = JSON.stringify(verification.verifiablePresentation, null, 2);
+    vpJson.textContent = JSON.stringify(verification.verifiablePresentation, null, 2);
 
-        // Add Explanation Block
-        const explanationDiv = document.createElement('div');
-        explanationDiv.className = 'vp-explanation';
-        explanationDiv.style.marginTop = '20px';
-        explanationDiv.style.padding = '20px';
-        explanationDiv.style.background = 'rgba(22, 101, 52, 0.2)'; // Darker green background for better contrast
-        explanationDiv.style.border = '1px solid rgba(34, 197, 94, 0.3)';
-        explanationDiv.style.borderRadius = '12px';
+    // Add Explanation Block
+    const explanationDiv = document.createElement('div');
+    explanationDiv.className = 'vp-explanation';
+    explanationDiv.style.marginTop = '20px';
+    explanationDiv.style.padding = '20px';
+    explanationDiv.style.background = 'rgba(22, 101, 52, 0.2)'; // Darker green background for better contrast
+    explanationDiv.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+    explanationDiv.style.borderRadius = '12px';
 
-        explanationDiv.innerHTML = explainVP(verification.verifiablePresentation);
+    explanationDiv.innerHTML = explainVP(verification.verifiablePresentation);
 
-        // Remove existing explanation if any
-        const existingExp = document.querySelector('.vp-explanation');
-        if (existingExp) existingExp.remove();
+    // Remove existing explanation if any
+    const existingExp = document.querySelector('.vp-explanation');
+    if (existingExp) existingExp.remove();
 
-        vpJson.parentNode.appendChild(explanationDiv);
-    } else {
-        vpJson.textContent = 'No Verifiable Presentation available for this verification method.';
-        const existingExp = document.querySelector('.vp-explanation');
-        if (existingExp) existingExp.remove();
-    }
+    vpJson.parentNode.appendChild(explanationDiv);
 
     resultDiv.style.display = 'block';
     resultDiv.scrollIntoView({ behavior: 'smooth' });
@@ -598,68 +772,3 @@ function displayInvalidResult(reason) {
     resultDiv.style.display = 'block';
     resultDiv.scrollIntoView({ behavior: 'smooth' });
 }
-
-function showToast(message, type = 'info') {
-    // Create toast container if it doesn't exist
-    let container = document.getElementById('toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container';
-        container.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        `;
-        document.body.appendChild(container);
-    }
-
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-
-    // Style based on type
-    let bg = '#333';
-    if (type === 'success') bg = '#22c55e';
-    if (type === 'error') bg = '#ef4444';
-    if (type === 'warning') bg = '#f97316';
-
-    toast.style.cssText = `
-        background: ${bg};
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        font-size: 14px;
-        opacity: 0;
-        transform: translateX(100%);
-        transition: all 0.3s ease;
-        min-width: 250px;
-    `;
-
-    container.appendChild(toast);
-
-    // Animate in
-    requestAnimationFrame(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateX(0)';
-    });
-
-    // Remove after 3 seconds
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Replace alerts with showToast in the file
-// Note: This replacement is done via the tool's instruction to the agent, 
-// but here I am defining the function. The actual replacement of alert() calls 
-// needs to be done in the code blocks where they appear.
-// Since I can't replace multiple non-contiguous blocks easily with one replace_file_content unless I use multi_replace,
-// I will add this function first, then do a multi_replace for the alerts.

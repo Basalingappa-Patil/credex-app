@@ -21,6 +21,7 @@ router.get('/by-id/:candidateId', verifyController.verifyById);
 router.post('/by-qr', upload.single('qrImage'), verifyController.verifyByQR);
 router.get('/claims/:candidateId', verifyController.getCandidateClaims);
 router.post('/credential/:credentialId', verifyController.verifyStoredCredential);
+router.post('/json', express.json({ limit: '10mb' }), verifyController.verifyByJSON);
 router.get('/revocation-status/:credentialId', verifyController.checkRevocationStatus);
 
 module.exports = router;

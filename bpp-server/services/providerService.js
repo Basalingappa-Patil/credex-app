@@ -1,102 +1,131 @@
-const fetch = require('node-fetch');
+const Student = require("../models/Student");
+const Subject = require("../models/Subject");
+const StudentMark = require("../models/StudentMark");
 
-// In-memory "Database" of Skills and Courses
-const CATALOG = [
-    {
-        id: 'provider-1',
-        descriptor: { name: 'Tech University' },
-        items: [
-            {
-                id: 'course-1',
-                descriptor: { name: 'Advanced React Certification' },
-                price: { currency: 'USD', value: '100' },
-                tags: { type: 'certification', skill: 'React' }
-            },
-            {
-                id: 'course-2',
-                descriptor: { name: 'Node.js Backend Masterclass' },
-                price: { currency: 'USD', value: '120' },
-                tags: { type: 'certification', skill: 'Node.js' }
-            }
-        ]
-    },
-    {
-        id: 'provider-2',
-        descriptor: { name: 'Design Institute' },
-        items: [
-            {
-                id: 'course-3',
-                descriptor: { name: 'UI/UX Fundamentals' },
-                price: { currency: 'USD', value: '90' },
-                tags: { type: 'course', skill: 'UI/UX' }
-            }
-        ]
-    }
-];
+const { calculateNSQFLevel } = require("./nsqfCalculator");
+const { issueCertificate } = require("./certificateService");
 
-class ProviderService {
-    async findOfferings(intent) {
-        // Real logic: Filter catalog based on intent
-        const query = intent.item?.descriptor?.name?.toLowerCase() || '';
+/**
+ * University-side skill verification service.
+ * This is the SINGLE authoritative verification engine.
+ *
+ * Input:
+ *  - student_id (string)
+ *  - skill_name (string)
+ *
+ * Output:
+ *  - verified (boolean)
+ *  - reason (string, if failed)
+ *  - confidence (number 0–100)
+ *  - nsqf_level (number 1–8)
+ *  - certificate_id (string, if verified)
+ */
+async function verifySkill({ student_id, skill_name }) {
+  // 1️⃣ Validate student existence
+  const student = await Student.findOne({ student_id });
 
-        return CATALOG.map(provider => ({
-            ...provider,
-            items: provider.items.filter(item =>
-                item.descriptor.name.toLowerCase().includes(query) ||
-                item.tags.skill.toLowerCase().includes(query)
-            )
-        })).filter(p => p.items.length > 0);
-    }
+  if (!student) {
+    return {
+      verified: false,
+      reason: "STUDENT_NOT_FOUND",
+      confidence: 0
+    };
+  }
 
-    async generateQuote(order) {
-        // Logic to calculate price
-        return {
-            ...order,
-            quote: {
-                price: { currency: 'USD', value: '100' }, // Simplified
-                breakup: []
-            }
-        };
-    }
+  // 2️⃣ Find subjects mapped to the requested skill
+  const subjects = await Subject.find({
+    mapped_skills: skill_name
+  });
 
-    async initializeOrder(order) {
-        return {
-            ...order,
-            payment: {
-                uri: 'https://payment.gateway/pay/123',
-                status: 'NOT-PAID'
-            }
-        };
-    }
+  if (!subjects || subjects.length === 0) {
+    return {
+      verified: false,
+      reason: "SKILL_NOT_RECOGNIZED_BY_UNIVERSITY",
+      confidence: 0
+    };
+  }
 
-    async confirmOrder(order) {
-        return {
-            ...order,
-            state: 'CONFIRMED',
-            fulfillment: {
-                state: 'Allocated'
-            }
-        };
-    }
+  const subjectCodes = subjects.map(s => s.subject_code);
 
-    async sendCallback(bapUri, action, payload) {
-        try {
-            const url = `${bapUri}/${action}`;
-            console.log(`[BPP] Sending callback ${action} to ${url}`);
+  // 3️⃣ Fetch student marks for those subjects
+  const marks = await StudentMark.find({
+    student_id,
+    subject_code: { $in: subjectCodes }
+  });
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+  if (!marks || marks.length === 0) {
+    return {
+      verified: false,
+      reason: "NO_RELEVANT_ACADEMIC_RECORD",
+      confidence: 0
+    };
+  }
 
-            if (!response.ok) {
-                console.error(`[BPP] Callback failed: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`[BPP] Callback error: ${error.message}`);
-        }
-    }
+  // 4️⃣ Apply university pass criteria
+  const PASS_MARK = 40;
+  const passedSubjects = marks.filter(m => m.marks >= PASS_MARK);
+
+  if (passedSubjects.length === 0) {
+    return {
+      verified: false,
+      reason: "FAILED_RELEVANT_SUBJECTS",
+      confidence: 25
+    };
+  }
+
+  // 5️⃣ Select strongest academic evidence
+  const bestResult = passedSubjects.reduce((best, current) =>
+    current.marks > best.marks ? current : best
+  );
+
+  // 6️⃣ Compute confidence score (transparent & explainable)
+  const confidence = Math.min(
+    100,
+    Math.round((bestResult.marks / 100) * 100)
+  );
+
+  // 7️⃣ Fetch subject metadata
+  const subject = subjects.find(
+    s => s.subject_code === bestResult.subject_code
+  );
+
+  // 8️⃣ Compute NSQF level (derived, not stored)
+  const nsqf_level = calculateNSQFLevel({
+    marks: bestResult.marks,
+    credits: subject.credits,
+    difficulty: subject.difficulty_level
+  });
+
+  // 9️⃣ Issue internal certificate (QR anchor)
+  const verificationResult = {
+    skill: skill_name,
+    subject_code: bestResult.subject_code,
+    marks: bestResult.marks,
+    nsqf_level
+  };
+
+  const certificate = await issueCertificate({
+    student,
+    verificationResult
+  });
+
+  // 🔟 Final authoritative response
+  return {
+    verified: true,
+    student_id,
+    university_id: student.university_id,
+    degree: student.degree,
+    skill: skill_name,
+    subject_code: bestResult.subject_code,
+    marks: bestResult.marks,
+    credits: subject.credits,
+    difficulty: subject.difficulty_level,
+    nsqf_level,
+    certificate_id: certificate.certificate_id,
+    confidence
+  };
 }
 
-module.exports = new ProviderService();
+module.exports = {
+  verifySkill
+};

@@ -3,32 +3,42 @@ const { generateToken } = require('../utils/jwt');
 const { checkDBConnection, dbUnavailableResponse } = require('../utils/dbHealth');
 
 exports.signup = async (req, res) => {
+  console.log('Signup Request Body:', req.body); // DEBUG LOG
+
   if (!checkDBConnection()) {
     return dbUnavailableResponse(res, 'user registration');
   }
 
   try {
-    const { email, password, name, role, profileId, universityName, employerId } = req.body;
+    let { email, password, name, role, profileId, universityName, employerId } = req.body;
+
+    // Sanitize inputs: Convert empty strings to undefined
+    if (!profileId || profileId.trim() === '') {
+      // Auto-generate profileId if missing
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const namePrefix = name ? name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '') : 'user';
+      profileId = `${namePrefix}${randomSuffix}`;
+    }
+    if (!employerId) employerId = undefined;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('Signup failed: Email already registered:', email);
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Sanitize inputs: Convert empty strings to undefined for unique sparse fields
-    const sanitizedProfileId = profileId && profileId.trim() !== '' ? profileId : undefined;
-    const sanitizedEmployerId = employerId && employerId.trim() !== '' ? employerId : undefined;
-
-    if (sanitizedProfileId) {
-      const existingProfileId = await User.findOne({ profileId: sanitizedProfileId });
+    if (profileId) {
+      const existingProfileId = await User.findOne({ profileId });
       if (existingProfileId) {
+        console.log('Signup failed: Candidate ID taken:', profileId);
         return res.status(400).json({ error: 'Candidate ID already taken' });
       }
     }
 
-    if (sanitizedEmployerId) {
-      const existingEmployerId = await User.findOne({ employerId: sanitizedEmployerId });
+    if (employerId) {
+      const existingEmployerId = await User.findOne({ employerId });
       if (existingEmployerId) {
+        console.log('Signup failed: Employer ID taken:', employerId);
         return res.status(400).json({ error: 'Employer ID already taken' });
       }
     }
@@ -38,13 +48,14 @@ exports.signup = async (req, res) => {
       password,
       name,
       role: role || 'candidate',
-      profileId: sanitizedProfileId,
+      profileId,
       universityName,
-      employerId: sanitizedEmployerId
+      employerId
     });
 
     const token = generateToken(user._id, user.role);
 
+    console.log('Signup successful for:', email);
     res.status(201).json({
       message: 'User registered successfully',
       user: {
@@ -56,28 +67,11 @@ exports.signup = async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('Signup error:', error);
-
-    // Handle Duplicate Key Errors (E11000)
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      const fieldName = field === 'profileId' ? 'Candidate ID' :
-        field === 'employerId' ? 'Employer ID' :
-          field === 'email' ? 'Email' : field;
-      return res.status(400).json({ error: `${fieldName} is already taken.` });
-    }
-
-    // Handle Mongoose Validation Errors
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
-      return res.status(400).json({ error: messages.join(', ') });
-    }
-
+    console.error('Signup error details:', error); // DETAILED LOG
     if (error.name === 'MongooseError' || error.name === 'MongoError') {
       return dbUnavailableResponse(res, 'user registration');
     }
-
-    // Return actual error message for debugging
+    // Return the actual error message for debugging (remove in prod)
     res.status(500).json({ error: 'Registration failed: ' + error.message });
   }
 };

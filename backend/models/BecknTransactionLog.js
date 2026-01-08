@@ -39,7 +39,7 @@ const becknTransactionLogSchema = new mongoose.Schema({
   }
 });
 
-
+becknTransactionLogSchema.index({ transactionId: 1 });
 becknTransactionLogSchema.index({ action: 1, timestamp: -1 });
 
 module.exports = mongoose.model('BecknTransactionLog', becknTransactionLogSchema);
