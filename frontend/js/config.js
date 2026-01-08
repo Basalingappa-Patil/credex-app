@@ -5,7 +5,7 @@ const CONFIG = {
     API_URL: window.BACKEND_URL || (
         window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? 'http://localhost:5001/api'
-            : 'https://REPLACE_WITH_YOUR_RENDER_BACKEND_URL.onrender.com/api' // ⚠️ IMPORTANT: Replace this with your actual Render Backend URL
+            : 'https://credex-backend.onrender.com/api' // Updated from deployment logs
     )
 };
 
