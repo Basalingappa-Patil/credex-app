@@ -1,0 +1,5 @@
+commit bd30febbe7d90277f3d57c95e047e03fa7e75833
+Author: Basalingappa-Patil <vaibhavpatil1267@gmail.com>
+Date:   Thu Jan 8 08:24:35 2026 +0530
+
+    Fix: Filter deleted jobs from candidate dashboard & Cleanup UI
