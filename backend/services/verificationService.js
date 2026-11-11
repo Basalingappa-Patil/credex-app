@@ -1,7 +1,7 @@
 const CandidateSkillGraph = require('../models/CandidateSkillGraph');
 const User = require('../models/User');
 const VerificationLog = require('../models/VerificationLog');
-const { generateVerifiablePresentation, verifySignature } = require('../utils/signature');
+const { generateVerifiablePresentation } = require('../utils/signature');
 const { v4: uuidv4 } = require('uuid');
 const fetch = require('node-fetch');
 const { decodeCredentialPayload, isExpired, registryConfiguration } = require('../utils/verificationPolicy');
@@ -283,12 +283,13 @@ class VerificationService {
           const docToVerify = { ...jsonObj };
           delete docToVerify.proof;
 
-          const isValid = verifySignature(docToVerify, p.proofValue);
+          // The application currently has no trusted issuer-key resolver.
+          // Verifying with this service's own local key would not establish issuer identity.
+          const isValid = false;
 
-          checks['credential-proof'].verified = isValid;
-          isVerified = isValid;
-
-          if (!isValid) checks['credential-proof'].error = 'Digital Signature Verification Failed';
+          checks['credential-proof'].verified = false;
+          isVerified = false;
+          checks['credential-proof'].error = 'Trusted issuer public-key resolution is not configured';
         } else {
           checks['credential-proof'].error = 'Proof value missing';
         }
