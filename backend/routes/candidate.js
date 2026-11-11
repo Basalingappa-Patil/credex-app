@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-const { authMiddleware } = require("../middleware/auth");
+const { authMiddleware, candidateMiddleware } = require("../middleware/auth");
 const candidateController = require("../controllers/candidateController");
 const { v4: uuidv4 } = require("uuid");
 
@@ -16,7 +16,7 @@ const JobApplication = require("../models/JobApplication");
 // ----------------------------------
 // Candidate Auth
 // ----------------------------------
-router.use(authMiddleware);
+router.use(authMiddleware, candidateMiddleware);
 
 // ----------------------------------
 // Candidate Routes
@@ -46,11 +46,11 @@ router.get("/jobs", async (req, res) => {
 // Student applies for a job
 // ----------------------------------
 router.post("/jobs/:job_id/apply", async (req, res) => {
-  const { student_id } = req.body;
+  const student_id = req.user.profileId;
   const { job_id } = req.params;
 
   if (!student_id) {
-    return res.status(400).json({ error: "student_id required" });
+    return res.status(400).json({ error: "Candidate profile is incomplete" });
   }
 
   const job = await Job.findOne({ job_id });

@@ -35,7 +35,20 @@ mongoose
     process.exit(1);
   });
 
-app.use(cors());
+// Beckn callbacks are server-to-server; browser access is restricted to explicit origins.
+const allowedOrigins = (process.env.CORS_ORIGINS || (process.env.NODE_ENV !== "production"
+  ? "http://localhost:6000,http://127.0.0.1:6000"
+  : ""))
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Origin is not allowed by CORS"));
+  }
+}));
 app.use(express.json());
 
 // Logging Middleware

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 const { checkDBConnection, dbUnavailableResponse } = require('../utils/dbHealth');
+const { getPublicRegistrationRole } = require('../utils/registrationPolicy');
 
 exports.signup = async (req, res) => {
   if (!checkDBConnection()) {
@@ -8,7 +9,13 @@ exports.signup = async (req, res) => {
   }
 
   try {
-    let { email, password, name, role, profileId, universityName, employerId } = req.body;
+    let { email, password, name, profileId, universityName, employerId } = req.body;
+    // Public self-registration must never create privileged accounts.
+    // Employer accounts remain self-service in this prototype, but admin provisioning is out-of-band.
+    const role = getPublicRegistrationRole(req.body.role);
+    if (!role) {
+      return res.status(403).json({ error: 'This role cannot be created through public registration' });
+    }
 
     // Sanitize inputs: Convert empty strings to undefined
     if (!profileId || profileId.trim() === '') {
@@ -45,7 +52,7 @@ exports.signup = async (req, res) => {
       email,
       password,
       name,
-      role: role || 'candidate',
+      role,
       profileId,
       universityName,
       employerId

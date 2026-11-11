@@ -1,4 +1,8 @@
 const API_URL = window.API_URL || 'http://localhost:5001/api';
+const authHeaders = (headers = {}) => ({
+    ...headers,
+    Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -48,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('verificationResult').style.display = 'none';
 
         try {
-            const response = await fetch(`${API_URL}/verify/claims/${candidateId}`);
+            const response = await fetch(`${API_URL}/verify/claims/${candidateId}`, { headers: authHeaders() });
             const data = await response.json();
 
             if (data.success) {
@@ -74,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         verifyAuthenticityBtn.textContent = 'Verifying...';
 
         try {
-            const response = await fetch(`${API_URL}/verify/by-id/${candidateId}`);
+            const response = await fetch(`${API_URL}/verify/by-id/${candidateId}`, { headers: authHeaders() });
             const data = await response.json();
 
             if (data.success) {
@@ -155,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(`${API_URL}/verify/json`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify(jsonObj)
                 });
                 const data = await response.json();
@@ -304,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(`${API_URL}/employer/jobs`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify(jobData)
                 });
 
@@ -350,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/employer/jobs?employer_id=${user.employerId}`);
+            const response = await fetch(`${API_URL}/employer/jobs?employer_id=${encodeURIComponent(user.employerId)}`, { headers: authHeaders() });
             const jobs = await response.json();
 
             if (response.ok) {
@@ -397,7 +401,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const response = await fetch(`${API_URL}/employer/jobs/${jobId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: authHeaders()
             });
 
             if (response.ok) {
@@ -435,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/employer/applications?employer_id=${user.employerId}`);
+            const response = await fetch(`${API_URL}/employer/applications?employer_id=${encodeURIComponent(user.employerId)}`, { headers: authHeaders() });
             const data = await response.json();
 
             if (response.ok) {
@@ -535,7 +540,8 @@ window.verifyStoredCertificate = async (credentialId) => {
 
     try {
         const response = await fetch(`${API_URL}/verify/credential/${credentialId}`, {
-            method: 'POST'
+            method: 'POST',
+            headers: authHeaders()
         });
         const data = await response.json();
 
@@ -654,19 +660,20 @@ function displayVerificationResult(verification) {
     const skillsInfo = document.getElementById('skillsInfo');
     const vpJson = document.getElementById('vpJson');
 
-    statusBadge.className = 'status-badge verified';
-    statusBadge.textContent = '✓ Verified';
+    const issuerVerified = verification.verificationStatus === 'verified';
+    statusBadge.className = issuerVerified ? 'status-badge verified' : 'status-badge invalid';
+    statusBadge.textContent = issuerVerified ? '✓ Verified by issuer' : 'Not issuer-verified';
 
     candidateInfo.innerHTML = `
         <h3>Candidate Information</h3>
         <p><strong>Name:</strong> ${verification.candidateName}</p>
         <p><strong>Overall Score:</strong> ${Math.round(verification.overallScore || 0)}/100</p>
         <p><strong>Total Skills:</strong> ${verification.skillCount}</p>
-        <p><strong>Verified At:</strong> ${new Date(verification.timestamp).toLocaleString()}</p>
+        <p><strong>Generated At:</strong> ${new Date(verification.timestamp).toLocaleString()}</p>
     `;
 
     skillsInfo.innerHTML = `
-        <h3>Verified Skills</h3>
+        <h3>Skill claims (not issuer-verified)</h3>
         ${verification.skills.map(skill => `
             <div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color);">
                 <strong>${skill.name}</strong>
@@ -706,48 +713,15 @@ function displayVerificationResult(verification) {
 }
 
 function explainVP(vp) {
-    if (!vp || !vp.verifiableCredential || vp.verifiableCredential.length === 0) return '';
-
-    const cred = vp.verifiableCredential[0];
-    const subject = cred.credentialSubject;
-    const proof = vp.proof;
+    if (!vp || !Array.isArray(vp.verifiableCredential) || vp.verifiableCredential.length === 0) return '';
 
     return `
-        <h3 style="color: #4ade80; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-            ✅ Successfully Verified
+        <h3 style="color: #fbbf24; margin-bottom: 15px;">
+            ⚠️ Issuer verification not established
         </h3>
         <div style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.6;">
-            <p style="margin-bottom: 15px;">
-                This credential has been cryptographically validated against the <strong>Beckn Protocol</strong> and <strong>ONEST Network</strong> standards. Here is a detailed breakdown of what this verification guarantees:
-            </p>
-            
-            <div style="margin-bottom: 12px;">
-                <strong style="color: #fff;">1. Identity Confirmation:</strong>
-                <div style="margin-left: 20px; color: #d1d5db;">
-                    The individual <em>${subject.name}</em> is the legitimate holder of this credential. Their digital identity (${subject.id}) has been authenticated.
-                </div>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <strong style="color: #fff;">2. Skill Validation:</strong>
-                <div style="margin-left: 20px; color: #d1d5db;">
-                    The skill <strong>${subject.skill.name}</strong> has been formally assessed. The candidate has achieved <strong>Level ${subject.skill.nsqfLevel}</strong> proficiency according to the National Skills Qualification Framework (NSQF).
-                </div>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <strong style="color: #fff;">3. Trusted Issuance:</strong>
-                <div style="margin-left: 20px; color: #d1d5db;">
-                    This credential was issued by <strong>${subject.skill.sources[0].issuer}</strong>, a recognized entity in the network. The issuer's digital signature confirms they vouch for this data.
-                </div>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <strong style="color: #fff;">4. Data Integrity (Tamper-Proof):</strong>
-                <div style="margin-left: 20px; color: #d1d5db;">
-                    The <strong>Ed25519 Digital Signature</strong> below ensures that this document has not been altered by even a single byte since it was issued on ${new Date(cred.issuanceDate).toLocaleDateString()}. Any modification would immediately invalidate this verification.
-                </div>
-            </div>
+            <p>This is a presentation generated by the CredEx prototype. Its local signature does not establish that an external educational institution issued or authenticated the claims.</p>
+            <p>Do not rely on this output for hiring, admissions, licensing, or other trust decisions until a trusted issuer-key and registry verification flow is implemented.</p>
         </div>
     `;
 }

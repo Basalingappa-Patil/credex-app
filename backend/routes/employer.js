@@ -9,17 +9,19 @@ const JobApplication = require("../models/JobApplication");
 const Issuer = require("../models/Issuer");
 
 const router = express.Router();
+const { authMiddleware, employerMiddleware } = require("../middleware/auth");
 
 /**
  * ---------------------------------------
  * Employer posts a job
  * ---------------------------------------
  */
-router.post("/jobs", async (req, res) => {
+router.post("/jobs", authMiddleware, employerMiddleware, async (req, res) => {
   try {
-    const { employer_id, title, description, required_skills } = req.body;
+    const { title, description, required_skills } = req.body;
+    const employer_id = req.user.employerId;
 
-    if (!employer_id || !title || !required_skills) {
+    if (!title || !required_skills) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -71,10 +73,10 @@ router.get("/jobs", async (req, res) => {
  * Delete a job
  * ---------------------------------------
  */
-router.delete("/jobs/:job_id", async (req, res) => {
+router.delete("/jobs/:job_id", authMiddleware, employerMiddleware, async (req, res) => {
   try {
     const { job_id } = req.params;
-    const result = await Job.deleteOne({ job_id });
+    const result = await Job.deleteOne({ job_id, employer_id: req.user.employerId });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: "Job not found" });
@@ -92,9 +94,9 @@ router.delete("/jobs/:job_id", async (req, res) => {
  * List applications for an employer
  * ---------------------------------------
  */
-router.get("/applications", async (req, res) => {
+router.get("/applications", authMiddleware, employerMiddleware, async (req, res) => {
   try {
-    const { employer_id } = req.query;
+    const employer_id = req.user.employerId;
 
     if (!employer_id) {
       return res.status(400).json({ error: "Employer ID required" });
@@ -162,7 +164,7 @@ router.get("/applications", async (req, res) => {
  * Employer triggers verification
  * ---------------------------------------
  */
-router.post("/applications/:application_id/verify", async (req, res) => {
+router.post("/applications/:application_id/verify", authMiddleware, employerMiddleware, async (req, res) => {
   console.log("🔥 EMPLOYER VERIFY ROUTE HIT");
 
   try {
@@ -182,7 +184,7 @@ router.post("/applications/:application_id/verify", async (req, res) => {
 
     // 2️⃣ Load job
     const job = await Job.findOne({ job_id: application.job_id });
-    if (!job) {
+    if (!job || job.employer_id !== req.user.employerId) {
       return res.status(404).json({ error: "Job not found" });
     }
 
