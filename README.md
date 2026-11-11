@@ -140,7 +140,7 @@ The backend serves the `frontend/` directory as static files. Start the backend 
 - Store production secrets in the hosting provider's secret manager or environment configuration.
 - Rotate any credential or private key that has been committed to a public repository.
 - Do not log passwords, tokens, private key material, or full request bodies containing personal data.
-- Restrict CORS origins and use HTTPS before exposing a deployment publicly.
+- Restrict CORS origins and use HTTPS before exposing a deployment publicly. Configure `CORS_ORIGINS` as a comma-separated list of exact frontend origins (scheme + hostname, no path); production has no permissive wildcard default.
 - Review authentication, authorization, input validation, file uploads, and cryptographic signing before production use.
 - The current BPP crypto helper generates a new signing key pair in process memory at startup. Its identity is therefore not stable across restarts; use managed persistent key material and a documented key-registration/rotation process before relying on it for production signatures.
 
