@@ -8,6 +8,19 @@ const morgan = require("morgan");
 const { exec } = require("child_process");
 
 // ---------------------
+// Required configuration
+// ---------------------
+if (!process.env.MONGODB_URI) {
+  console.error("ERROR: MONGODB_URI is missing in backend/.env");
+  process.exit(1);
+}
+
+if (!process.env.JWT_SECRET || Buffer.byteLength(process.env.JWT_SECRET, "utf8") < 32) {
+  console.error("ERROR: JWT_SECRET must be configured with at least 32 bytes.");
+  process.exit(1);
+}
+
+// ---------------------
 // Route Imports
 // ---------------------
 const authRoutes = require("./routes/auth");
@@ -26,14 +39,6 @@ const { startBackgroundJobs } = require("./services/backgroundJobs");
 // ---------------------
 const app = express();
 const PORT = process.env.PORT || 5001;
-
-// ---------------------
-// ENV SAFETY CHECK
-// ---------------------
-if (!process.env.MONGODB_URI) {
-  console.error("❌ ERROR: MONGODB_URI missing in backend/.env");
-  process.exit(1);
-}
 
 // ---------------------
 // MongoDB Connection
@@ -68,8 +73,8 @@ app.use("/api/candidate", candidateRoutes);
 app.use("/api/employer", employerRoutes);
 app.use("/api/beckn", becknRoutes);
 app.use("/api/verify", verifyRoutes);
-app.use("/api/admin", adminRoutes);
 app.use("/api/qr", qrRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ---------------------
 // Health Check
@@ -105,6 +110,8 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`[OK] Backend running on http://localhost:${PORT}`);
   console.log(`[OK] Environment: ${process.env.NODE_ENV || "development"}`);
 
-  // Auto-open browser (Windows)
-  exec(`start http://localhost:${PORT}`);
+  // Auto-open browser (Windows development convenience)
+  if (process.platform === "win32") {
+    exec(`start http://localhost:${PORT}`);
+  }
 });

@@ -1,19 +1,31 @@
 const jwt = require('jsonwebtoken');
 
+const MIN_SECRET_BYTES = 32;
+
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret || Buffer.byteLength(secret, 'utf8') < MIN_SECRET_BYTES) {
+    throw new Error('JWT_SECRET must be configured with at least 32 bytes.');
+  }
+
+  return secret;
+};
+
 const generateToken = (userId, role) => {
   return jwt.sign(
     { userId, role },
-    process.env.JWT_SECRET || 'your-secret-key',
+    getJwtSecret(),
     { expiresIn: '7d' }
   );
 };
 
 const verifyToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    return jwt.verify(token, getJwtSecret());
   } catch (error) {
     return null;
   }
 };
 
-module.exports = { generateToken, verifyToken };
+module.exports = { generateToken, verifyToken, getJwtSecret };
