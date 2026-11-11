@@ -4,7 +4,7 @@ const VerificationLog = require('../models/VerificationLog');
 const { generateVerifiablePresentation, verifySignature } = require('../utils/signature');
 const { v4: uuidv4 } = require('uuid');
 const fetch = require('node-fetch');
-const crypto = require('crypto');
+const { decodeCredentialPayload, isExpired, registryConfiguration } = require('../utils/verificationPolicy');
 
 class VerificationService {
   async verifyCandidate(candidateId) {
@@ -59,19 +59,15 @@ class VerificationService {
         details: { vpType: verifiablePresentation.type }
       });
 
-      // CRITICAL FIX: Update Credential Status in DB
-      await require('../models/Credential').updateMany(
-        { candidateId: candidate._id, verificationStatus: 'pending' },
-        { $set: { verificationStatus: 'verified', verifiedAt: new Date() } }
-      );
-
+      // A locally generated presentation is not proof that an external issuer
+      // authenticated the underlying claims. Never promote pending credentials here.
       // CRITICAL FIX: Update Skill Graph immediately
       const updatedSkillGraph = await require('./skillMappingService').updateCandidateSkillGraph(candidate._id);
 
       const result = {
         candidateId: candidate._id,
         candidateName: candidate.name,
-        verificationStatus: 'verified',
+        verificationStatus: 'not_verified',
         timestamp: new Date(),
         skillCount: updatedSkillGraph.skillCount,
         overallScore: updatedSkillGraph.overallScore,
@@ -106,55 +102,24 @@ class VerificationService {
 
   async verifyQR(qrData) {
     try {
-      // 1. Decode QR Data (Assuming Base64 encoded JSON)
-      const decodedString = Buffer.from(qrData, 'base64').toString('utf-8');
-      let credentialData;
-      try {
-        credentialData = JSON.parse(decodedString);
-      } catch (e) {
-        throw new Error('Invalid QR format: Not a valid JSON');
-      }
+      const credentialData = decodeCredentialPayload(qrData);
 
-      // 2. Check Expiry (if applicable)
-      if (credentialData.expirationDate && new Date(credentialData.expirationDate) < new Date()) {
+      if (isExpired(credentialData.expirationDate)) {
         return {
           valid: false,
-          reason: 'Credential expired',
-          details: { expirationDate: credentialData.expirationDate }
+          reason: 'Credential expired or has an invalid expiration date'
         };
       }
 
-      // 3. Verify Signature (Simulated for now, replace with actual crypto verification)
-      // In a real scenario, you would fetch the issuer's public key from the DID document or registry
-      // const isValid = verifySignature(credentialData, issuerPublicKey);
-      const isValid = true; // Placeholder for actual signature verification
-
-      if (!isValid) {
-        return {
-          valid: false,
-          reason: 'Invalid signature'
-        };
-      }
-
-      // 4. Verify against ONEST Registry (if it's an ONEST credential)
-      if (credentialData.issuer && credentialData.issuer.includes('onest')) {
-        const onestVerification = await this.verifyONESTCredential(credentialData.id);
-        if (!onestVerification.valid) {
-          return {
-            valid: false,
-            reason: 'ONEST Registry verification failed',
-            details: onestVerification
-          };
-        }
-      }
-
+      // Do not validate a credential using this service's own signing key.
+      // A credential must be checked against a trusted, issuer-specific public key
+      // resolved from an authenticated registry. That trust/key-resolution flow
+      // is not implemented yet, so this path deliberately fails closed.
       return {
-        valid: true,
-        credential: credentialData,
-        verificationMethod: 'digital_signature',
-        timestamp: new Date()
+        valid: false,
+        reason: 'Issuer signature verification is not configured; credential authenticity cannot be established',
+        verificationMethod: 'unavailable'
       };
-
     } catch (error) {
       return {
         valid: false,
@@ -164,29 +129,38 @@ class VerificationService {
   }
 
   async verifyONESTCredential(credentialId) {
+    const registry = registryConfiguration(process.env.ONEST_REGISTRY_URL);
+    if (!registry.configured) {
+      return { valid: false, status: 'registry_not_configured' };
+    }
+
+    if (typeof credentialId !== 'string' || credentialId.trim().length === 0) {
+      return { valid: false, status: 'invalid_credential_id' };
+    }
+
     try {
-      const registryUrl = process.env.ONEST_REGISTRY_URL;
-      if (!registryUrl) {
-        console.warn('ONEST_REGISTRY_URL not configured, skipping registry check');
-        return { valid: true, status: 'skipped_registry_check' };
-      }
+      const endpoint = new URL(
+        `credentials/${encodeURIComponent(credentialId)}`,
+        registry.url.toString().endsWith('/') ? registry.url : `${registry.url.toString()}/`
+      );
+      const response = await fetch(endpoint.toString(), {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(5000)
+      });
 
-      const response = await fetch(`${registryUrl}/credentials/${credentialId}`);
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.status === 'active') {
-          return { valid: true, status: 'active' };
-        } else {
-          return { valid: false, status: data.status || 'unknown' };
-        }
-      } else {
+      if (!response.ok) {
         return { valid: false, status: `http_error_${response.status}` };
       }
+
+      const data = await response.json();
+      if (data && data.status === 'active') {
+        return { valid: true, status: 'active' };
+      }
+      return { valid: false, status: data?.status || 'unknown' };
     } catch (error) {
       console.error('ONEST Registry check failed:', error.message);
-      // Fallback: if registry is down, rely on signature
-      return { valid: true, status: 'registry_unavailable_fallback_signature' };
+      return { valid: false, status: 'registry_unavailable' };
     }
   }
 
@@ -196,9 +170,9 @@ class VerificationService {
 
     return {
       credentialId,
-      isRevoked: !verification.valid,
+      isRevoked: verification.status === 'revoked',
       lastChecked: new Date(),
-      status: verification.valid ? 'active' : 'revoked'
+      status: verification.valid ? 'active' : verification.status
     };
   }
   async verifyJSON(jsonObj) {
