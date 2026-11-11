@@ -35,10 +35,6 @@ exports.verifyById = async (req, res) => {
       return res.status(403).json({ error: 'Candidate access requires an application to one of your jobs' });
     }
 
-    if (!(await employerHasCandidateApplication(req, candidate))) {
-      return res.status(403).json({ error: 'Candidate access requires an application to one of your jobs' });
-    }
-
     const verification = await verificationService.verifyCandidate(candidate._id);
 
     res.json({
@@ -245,6 +241,10 @@ exports.getCandidateClaims = async (req, res) => {
 
     if (!candidate || candidate.role !== 'candidate') {
       return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    if (!(await employerHasCandidateApplication(req, candidate))) {
+      return res.status(403).json({ error: 'Candidate access requires an application to one of your jobs' });
     }
 
     // Fetch raw credentials (claims) using the resolved _id
