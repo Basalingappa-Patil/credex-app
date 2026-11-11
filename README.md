@@ -148,6 +148,10 @@ Read [SECURITY.md](SECURITY.md) for vulnerability reporting guidance.
 
 ## Project documentation
 
+- [Developer demo guide](docs/DEMO_GUIDE.md)
+- [Known limitations and pilot blockers](docs/KNOWN_LIMITATIONS.md)
+- [Staged pilot plan](docs/PILOT_PLAN.md)
+- [Developer and institution outreach kit](docs/OUTREACH_KIT.md)
 - [Backend API documentation](backend/API_DOCUMENTATION.md)
 - [Backend implementation notes](backend/README.md)
 - [BPP deployment guide](BPP_SERVER_DEPLOYMENT.md)
