@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a user-focused improvement to CredEx
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user need or workflow is currently unsupported?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behaviour you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Users and impact
+      description: Who benefits, and how would success be measured?
+    validations:
+      required: false
