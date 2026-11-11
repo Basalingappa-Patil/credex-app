@@ -66,7 +66,7 @@ credex-app/
 
 ## Prerequisites
 
-- Node.js 20 or a compatible supported version
+- Node.js 22 or a compatible supported version
 - npm
 - A MongoDB instance
 - Environment configuration for each service you run
