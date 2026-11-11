@@ -60,7 +60,24 @@ mongoose
 // ---------------------
 // Global Middleware
 // ---------------------
-app.use(cors());
+// Allow only explicitly configured browser origins in production.
+// Requests without an Origin header (for example, server-to-server calls)
+// are not subject to browser CORS checks.
+const allowedOrigins = (process.env.CORS_ORIGINS || (process.env.NODE_ENV !== "production"
+  ? "http://localhost:5001,http://127.0.0.1:5001"
+  : ""))
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Origin is not allowed by CORS"));
+  }
+}));
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
