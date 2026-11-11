@@ -1,4 +1,8 @@
 const API_URL = window.API_URL || 'http://localhost:5001/api';
+const authHeaders = (headers = {}) => ({
+    ...headers,
+    Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -48,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('verificationResult').style.display = 'none';
 
         try {
-            const response = await fetch(`${API_URL}/verify/claims/${candidateId}`);
+            const response = await fetch(`${API_URL}/verify/claims/${candidateId}`, { headers: authHeaders() });
             const data = await response.json();
 
             if (data.success) {
@@ -74,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         verifyAuthenticityBtn.textContent = 'Verifying...';
 
         try {
-            const response = await fetch(`${API_URL}/verify/by-id/${candidateId}`);
+            const response = await fetch(`${API_URL}/verify/by-id/${candidateId}`, { headers: authHeaders() });
             const data = await response.json();
 
             if (data.success) {
@@ -155,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(`${API_URL}/verify/json`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify(jsonObj)
                 });
                 const data = await response.json();
@@ -304,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(`${API_URL}/employer/jobs`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify(jobData)
                 });
 
@@ -350,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/employer/jobs?employer_id=${user.employerId}`);
+            const response = await fetch(`${API_URL}/employer/jobs?employer_id=${encodeURIComponent(user.employerId)}`, { headers: authHeaders() });
             const jobs = await response.json();
 
             if (response.ok) {
@@ -397,7 +401,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const response = await fetch(`${API_URL}/employer/jobs/${jobId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: authHeaders()
             });
 
             if (response.ok) {
@@ -435,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/employer/applications?employer_id=${user.employerId}`);
+            const response = await fetch(`${API_URL}/employer/applications?employer_id=${encodeURIComponent(user.employerId)}`, { headers: authHeaders() });
             const data = await response.json();
 
             if (response.ok) {
@@ -535,7 +540,8 @@ window.verifyStoredCertificate = async (credentialId) => {
 
     try {
         const response = await fetch(`${API_URL}/verify/credential/${credentialId}`, {
-            method: 'POST'
+            method: 'POST',
+            headers: authHeaders()
         });
         const data = await response.json();
 
@@ -654,8 +660,9 @@ function displayVerificationResult(verification) {
     const skillsInfo = document.getElementById('skillsInfo');
     const vpJson = document.getElementById('vpJson');
 
-    statusBadge.className = 'status-badge verified';
-    statusBadge.textContent = '✓ Verified';
+    const issuerVerified = verification.verificationStatus === 'verified';
+    statusBadge.className = issuerVerified ? 'status-badge verified' : 'status-badge invalid';
+    statusBadge.textContent = issuerVerified ? '✓ Verified by issuer' : 'Not issuer-verified';
 
     candidateInfo.innerHTML = `
         <h3>Candidate Information</h3>
@@ -666,7 +673,7 @@ function displayVerificationResult(verification) {
     `;
 
     skillsInfo.innerHTML = `
-        <h3>Verified Skills</h3>
+        <h3>Skill claims (not issuer-verified)</h3>
         ${verification.skills.map(skill => `
             <div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color);">
                 <strong>${skill.name}</strong>
@@ -718,7 +725,7 @@ function explainVP(vp) {
         </h3>
         <div style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.6;">
             <p style="margin-bottom: 15px;">
-                This credential has been cryptographically validated against the <strong>Beckn Protocol</strong> and <strong>ONEST Network</strong> standards. Here is a detailed breakdown of what this verification guarantees:
+                This presentation is generated by the CredEx prototype. It is not proof that an external issuer authenticated the claims. Do not rely on it for hiring, admissions, or other trust decisions.
             </p>
             
             <div style="margin-bottom: 12px;">
