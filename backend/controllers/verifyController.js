@@ -98,22 +98,11 @@ exports.verifyStoredCredential = async (req, res) => {
 
       const verification = await verificationService.verifyCandidate(candidate._id);
 
-      // Update the credential status as well since we just verified it
-      credential.verificationStatus = 'verified';
-      credential.verifiedAt = new Date();
-      await credential.save();
-
+      // Candidate profile lookup is not issuer verification; do not mark a credential verified.
       return res.json({ success: true, verification, method: 'stored_qr_scan' });
     }
 
     const verificationResult = await verificationService.verifyQR(qrData);
-
-    // Update credential if valid
-    if (verificationResult.valid) {
-      credential.verificationStatus = 'verified';
-      credential.verifiedAt = new Date();
-      await credential.save();
-    }
 
     res.json({
       success: true,
