@@ -3,6 +3,7 @@ const router = express.Router();
 const verifyController = require('../controllers/verifyController');
 const multer = require('multer');
 const path = require('path');
+const { authMiddleware, employerMiddleware } = require('../middleware/auth');
 
 // Configure Multer for temp uploads
 const upload = multer({
@@ -17,10 +18,10 @@ const upload = multer({
     }
 });
 
-router.get('/by-id/:candidateId', verifyController.verifyById);
+router.get('/by-id/:candidateId', authMiddleware, employerMiddleware, verifyController.verifyById);
 router.post('/by-qr', upload.single('qrImage'), verifyController.verifyByQR);
-router.get('/claims/:candidateId', verifyController.getCandidateClaims);
-router.post('/credential/:credentialId', verifyController.verifyStoredCredential);
+router.get('/claims/:candidateId', authMiddleware, employerMiddleware, verifyController.getCandidateClaims);
+router.post('/credential/:credentialId', authMiddleware, employerMiddleware, verifyController.verifyStoredCredential);
 router.post('/json', express.json({ limit: '10mb' }), verifyController.verifyByJSON);
 router.get('/revocation-status/:credentialId', verifyController.checkRevocationStatus);
 
