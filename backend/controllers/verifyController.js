@@ -1,5 +1,18 @@
 const verificationService = require('../services/verificationService');
 const User = require('../models/User');
+const Job = require('../models/Job');
+const JobApplication = require('../models/JobApplication');
+
+async function employerHasCandidateApplication(req, candidate) {
+  if (!req.user || req.user.role !== 'employer' || !req.user.employerId) return false;
+  const employerJobs = await Job.find({ employer_id: req.user.employerId }).select('job_id');
+  const jobIds = employerJobs.map(job => job.job_id);
+  if (jobIds.length === 0) return false;
+  return Boolean(await JobApplication.findOne({
+    job_id: { $in: jobIds },
+    student_id: candidate.profileId
+  }).select('_id'));
+}
 
 exports.verifyById = async (req, res) => {
   try {
@@ -16,6 +29,14 @@ exports.verifyById = async (req, res) => {
 
     if (!candidate || candidate.role !== 'candidate') {
       return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    if (!(await employerHasCandidateApplication(req, candidate))) {
+      return res.status(403).json({ error: 'Candidate access requires an application to one of your jobs' });
+    }
+
+    if (!(await employerHasCandidateApplication(req, candidate))) {
+      return res.status(403).json({ error: 'Candidate access requires an application to one of your jobs' });
     }
 
     const verification = await verificationService.verifyCandidate(candidate._id);
