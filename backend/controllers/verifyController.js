@@ -111,7 +111,12 @@ exports.verifyStoredCredential = async (req, res) => {
 
     if (decodedJson && decodedJson.candidateId) {
       const candidate = await User.findById(decodedJson.candidateId);
-      if (!candidate) return res.status(404).json({ error: 'Candidate not found in QR data' });
+      if (!candidate || String(candidate._id) !== String(credential.candidateId)) {
+        return res.status(403).json({ error: 'QR candidate does not match the stored credential owner' });
+      }
+      if (!(await employerHasCandidateApplication(req, candidate))) {
+        return res.status(403).json({ error: 'Candidate access requires an application to one of your jobs' });
+      }
 
       const verification = await verificationService.verifyCandidate(candidate._id);
 
