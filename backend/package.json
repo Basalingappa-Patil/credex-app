@@ -33,7 +33,7 @@
     "node-cron": "^3.0.3",
     "node-fetch": "^2.7.0",
     "qrcode": "^1.5.4",
-    "sodium-native": "^4.0.4",
+    "sodium-native": "^5.2.0",
     "uuid": "^9.0.1"
   }
 }
