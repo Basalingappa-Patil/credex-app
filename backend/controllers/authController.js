@@ -3,8 +3,6 @@ const { generateToken } = require('../utils/jwt');
 const { checkDBConnection, dbUnavailableResponse } = require('../utils/dbHealth');
 
 exports.signup = async (req, res) => {
-  console.log('Signup Request Body:', req.body); // DEBUG LOG
-
   if (!checkDBConnection()) {
     return dbUnavailableResponse(res, 'user registration');
   }
@@ -23,14 +21,14 @@ exports.signup = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('Signup failed: Email already registered:', email);
+      console.warn('Signup rejected: email already registered');
       return res.status(400).json({ error: 'Email already registered' });
     }
 
     if (profileId) {
       const existingProfileId = await User.findOne({ profileId });
       if (existingProfileId) {
-        console.log('Signup failed: Candidate ID taken:', profileId);
+        console.warn('Signup rejected: candidate profile ID already exists');
         return res.status(400).json({ error: 'Candidate ID already taken' });
       }
     }
@@ -38,7 +36,7 @@ exports.signup = async (req, res) => {
     if (employerId) {
       const existingEmployerId = await User.findOne({ employerId });
       if (existingEmployerId) {
-        console.log('Signup failed: Employer ID taken:', employerId);
+        console.warn('Signup rejected: employer ID already exists');
         return res.status(400).json({ error: 'Employer ID already taken' });
       }
     }
@@ -55,7 +53,7 @@ exports.signup = async (req, res) => {
 
     const token = generateToken(user._id, user.role);
 
-    console.log('Signup successful for:', email);
+    console.log('Signup successful');
     res.status(201).json({
       message: 'User registered successfully',
       user: {
@@ -67,12 +65,11 @@ exports.signup = async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('Signup error details:', error); // DETAILED LOG
+    console.error('Signup failed:', error.name || 'UnknownError');
     if (error.name === 'MongooseError' || error.name === 'MongoError') {
       return dbUnavailableResponse(res, 'user registration');
     }
-    // Return the actual error message for debugging (remove in prod)
-    res.status(500).json({ error: 'Registration failed: ' + error.message });
+    res.status(500).json({ error: 'Registration failed' });
   }
 };
 
@@ -86,13 +83,13 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      console.log('Login failed: User not found for email:', email);
+      console.warn('Login failed: unknown account');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log('Login failed: Password mismatch for user:', email);
+      console.warn('Login failed: invalid credentials');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
