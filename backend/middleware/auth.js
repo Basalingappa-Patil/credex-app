@@ -41,4 +41,11 @@ const candidateMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = { authMiddleware, adminMiddleware, candidateMiddleware };
+const employerMiddleware = (req, res, next) => {
+  if (req.user && req.user.role === 'employer' && req.user.employerId) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Employer access required' });
+};
+
+module.exports = { authMiddleware, adminMiddleware, candidateMiddleware, employerMiddleware };
